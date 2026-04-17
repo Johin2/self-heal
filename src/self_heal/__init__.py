@@ -1,4 +1,4 @@
-"""self-heal: automatic repair for failing Python code, powered by LLMs."""
+"""self-heal: automatic repair for failing Python code, powered by any LLM."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from self_heal.core import repair
 from self_heal.llm import LLMProposer
 from self_heal.loop import RepairLoop
 from self_heal.types import Failure, RepairAttempt, RepairResult
+from self_heal.verify import Test, Verifier, check_tests, check_verifier
 
 if TYPE_CHECKING:
     from self_heal.llm import (
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
         OpenAIProposer,
     )
 
-__version__ = "0.0.2"
+__version__ = "0.1.0"
 
 
 def __getattr__(name: str) -> Any:
@@ -38,5 +39,9 @@ __all__ = [
     "RepairAttempt",
     "RepairLoop",
     "RepairResult",
+    "Test",
+    "Verifier",
+    "check_tests",
+    "check_verifier",
     "repair",
 ]
