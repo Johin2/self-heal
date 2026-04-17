@@ -19,6 +19,7 @@ Examples
 from __future__ import annotations
 
 import argparse
+import contextlib
 import difflib
 import importlib.util
 import inspect
@@ -227,10 +228,8 @@ def _wrap_pytest_test(module, fn_name: str, test_fn):
             test_fn()
         finally:
             for mod, orig in patched:
-                try:
+                with contextlib.suppress(Exception):
                     setattr(mod, fn_name, orig)
-                except Exception:  # noqa: BLE001
-                    pass
 
     verify.__name__ = getattr(test_fn, "__name__", "pytest_test")
     return verify

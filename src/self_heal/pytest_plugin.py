@@ -26,6 +26,7 @@ slated for v0.3 behind `--heal-apply`.
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import inspect
 from dataclasses import dataclass, field
@@ -155,10 +156,8 @@ def _heal_candidate(cand: _HealCandidate) -> str | None:
             test_body()
         finally:
             for mod in patched:
-                try:
+                with contextlib.suppress(Exception):
                     setattr(mod, fn_name, target_fn)
-                except Exception:  # noqa: BLE001
-                    pass
 
     verify_via_pytest_body.__name__ = f"pytest::{cand.nodeid}"
 

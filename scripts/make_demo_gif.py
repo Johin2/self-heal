@@ -11,7 +11,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-
 # -- Look & feel --------------------------------------------------------------
 
 WIDTH = 960
