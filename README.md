@@ -275,7 +275,11 @@ LiteLLMProposer(model="cohere/command-r-plus")
 - [ ] v0.5: `pytest --heal --apply` for in-place file patching
 - [ ] v1.0: stable API + extended benchmark suite (QuixBugs, HumanEval-Fix)
 
-## Development
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide: dev setup, everyday commands, how to add a new LLM proposer or benchmark task, and the PR checklist. Good first issues are tagged [here](https://github.com/Johin2/self-heal/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+
+## Development (quick start)
 
 ```bash
 git clone https://github.com/Johin2/self-heal.git
