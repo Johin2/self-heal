@@ -1,26 +1,27 @@
-"""LLM client abstraction for proposing code repairs."""
+"""Anthropic Claude proposer."""
 
 from __future__ import annotations
 
 import os
-from typing import Protocol
 
-from anthropic import Anthropic
-
-
-class LLMProposer(Protocol):
-    """Anything that can turn a (system, user) prompt into a repair proposal.
-
-    Implement this protocol to plug in OpenAI, a local model, or a test double.
-    """
-
-    def propose(self, system: str, user: str) -> str: ...
+try:
+    from anthropic import Anthropic
+except ImportError as _err:  # pragma: no cover
+    raise ImportError(
+        "ClaudeProposer requires the `anthropic` package. "
+        "Install with: pip install 'self-heal[claude]'"
+    ) from _err
 
 
 class ClaudeProposer:
-    """Claude-backed implementation of `LLMProposer`.
+    """Anthropic Claude-backed proposer.
 
     Reads `ANTHROPIC_API_KEY` from the environment unless `api_key` is passed.
+
+    Example:
+        from self_heal.llm import ClaudeProposer
+
+        proposer = ClaudeProposer(model="claude-sonnet-4-6")
     """
 
     def __init__(
