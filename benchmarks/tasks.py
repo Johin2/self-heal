@@ -227,6 +227,187 @@ def _sd_zero(fn):
     assert fn(0) == 0
 
 
+_gcd_buggy = """
+def gcd(a, b):
+    # Naive: infinite loop on negative inputs; doesn't handle 0.
+    while b != 0:
+        a, b = b, a % b
+    return a
+"""
+
+
+def _gcd_simple(fn):
+    assert fn(12, 8) == 4
+
+
+def _gcd_negative(fn):
+    assert fn(-12, 8) == 4
+
+
+def _gcd_zero(fn):
+    assert fn(7, 0) == 7
+
+
+_parse_version_buggy = """
+def parse_version(s):
+    # Naive: returns strings, fails on pre-release tags like '1.2.3-beta'.
+    return s.split('.')
+"""
+
+
+def _pv_simple(fn):
+    assert fn("1.2.3") == (1, 2, 3)
+
+
+def _pv_beta(fn):
+    assert fn("1.2.3-beta")[:3] == (1, 2, 3)
+
+
+_is_prime_buggy = """
+def is_prime(n):
+    # Naive: considers 1 prime; breaks on negatives.
+    if n == 2:
+        return True
+    for i in range(2, n):
+        if n % i == 0:
+            return False
+    return True
+"""
+
+
+def _ip_basic(fn):
+    assert fn(7) is True
+
+
+def _ip_one(fn):
+    assert fn(1) is False
+
+
+def _ip_negative(fn):
+    assert fn(-7) is False
+
+
+def _ip_large(fn):
+    assert fn(97) is True
+
+
+_group_by_buggy = """
+def group_by(items, key):
+    # Naive: assumes list input is sorted by key.
+    out = {}
+    for it in items:
+        k = key(it)
+        out.setdefault(k, []).append(it)
+    return out
+"""
+
+
+def _gb_unsorted(fn):
+    result = fn([1, 3, 2, 4, 5], lambda x: x % 2)
+    assert sorted(result[0]) == [2, 4]
+    assert sorted(result[1]) == [1, 3, 5]
+
+
+def _gb_empty(fn):
+    assert fn([], lambda x: x) == {}
+
+
+_levenshtein_buggy = """
+def levenshtein(a, b):
+    # Naive: only counts length difference.
+    return abs(len(a) - len(b))
+"""
+
+
+def _lv_equal(fn):
+    assert fn("kitten", "kitten") == 0
+
+
+def _lv_classic(fn):
+    assert fn("kitten", "sitting") == 3
+
+
+def _lv_empty(fn):
+    assert fn("", "abc") == 3
+
+
+_format_duration_buggy = """
+def format_duration(seconds):
+    # Naive: only handles seconds < 60.
+    return f"{seconds}s"
+"""
+
+
+def _fd_short(fn):
+    assert fn(45) == "45s"
+
+
+def _fd_minute(fn):
+    assert fn(90) == "1m 30s"
+
+
+def _fd_hour(fn):
+    assert fn(3725) == "1h 2m 5s"
+
+
+_chunks_buggy = """
+def chunks(items, n):
+    # Naive: off-by-one — returns n-1 items per chunk.
+    out = []
+    for i in range(0, len(items), n - 1):
+        out.append(items[i:i + n - 1])
+    return out
+"""
+
+
+def _ck_even(fn):
+    assert fn([1, 2, 3, 4], 2) == [[1, 2], [3, 4]]
+
+
+def _ck_uneven(fn):
+    assert fn([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]
+
+
+def _ck_single(fn):
+    assert fn([1, 2, 3], 3) == [[1, 2, 3]]
+
+
+_anagram_buggy = """
+def is_anagram(a, b):
+    # Naive: case-sensitive, doesn't ignore spaces.
+    return sorted(a) == sorted(b)
+"""
+
+
+def _an_basic(fn):
+    assert fn("listen", "silent") is True
+
+
+def _an_case(fn):
+    assert fn("Listen", "Silent") is True
+
+
+def _an_spaces(fn):
+    assert fn("anagram", "nag a ram") is True
+
+
+_normalize_whitespace_buggy = """
+def normalize_whitespace(s):
+    # Naive: only collapses spaces, not tabs/newlines.
+    while '  ' in s:
+        s = s.replace('  ', ' ')
+    return s.strip()
+"""
+
+
+def _nw_spaces(fn):
+    assert fn("a   b   c") == "a b c"
+
+
+def _nw_tabs(fn):
+    assert fn("a\t\tb\nc") == "a b c"
+
+
 # --- task list --------------------------------------------------------------
 
 
@@ -300,5 +481,68 @@ TASKS: list[Task] = [
         buggy_source=_sum_digits_buggy,
         function_name="sum_digits",
         tests=[_sd_positive, _sd_negative, _sd_zero],
+    ),
+    Task(
+        name="gcd",
+        description="Greatest common divisor (handle negatives and zero)",
+        buggy_source=_gcd_buggy,
+        function_name="gcd",
+        tests=[_gcd_simple, _gcd_negative, _gcd_zero],
+    ),
+    Task(
+        name="parse_version",
+        description="Parse SemVer string to (major, minor, patch) tuple",
+        buggy_source=_parse_version_buggy,
+        function_name="parse_version",
+        tests=[_pv_simple, _pv_beta],
+    ),
+    Task(
+        name="is_prime",
+        description="Primality test (handle 1, 2, negatives)",
+        buggy_source=_is_prime_buggy,
+        function_name="is_prime",
+        tests=[_ip_basic, _ip_one, _ip_negative, _ip_large],
+    ),
+    Task(
+        name="group_by",
+        description="Group items by key function (unsorted input)",
+        buggy_source=_group_by_buggy,
+        function_name="group_by",
+        tests=[_gb_unsorted, _gb_empty],
+    ),
+    Task(
+        name="levenshtein",
+        description="Levenshtein edit distance",
+        buggy_source=_levenshtein_buggy,
+        function_name="levenshtein",
+        tests=[_lv_equal, _lv_classic, _lv_empty],
+    ),
+    Task(
+        name="format_duration",
+        description="Format seconds as '1h 2m 5s'",
+        buggy_source=_format_duration_buggy,
+        function_name="format_duration",
+        tests=[_fd_short, _fd_minute, _fd_hour],
+    ),
+    Task(
+        name="chunks",
+        description="Split a list into chunks of size n (off-by-one)",
+        buggy_source=_chunks_buggy,
+        function_name="chunks",
+        tests=[_ck_even, _ck_uneven, _ck_single],
+    ),
+    Task(
+        name="is_anagram",
+        description="Anagram check (case-insensitive, ignore spaces)",
+        buggy_source=_anagram_buggy,
+        function_name="is_anagram",
+        tests=[_an_basic, _an_case, _an_spaces],
+    ),
+    Task(
+        name="normalize_whitespace",
+        description="Collapse all whitespace (incl. tabs/newlines) to single spaces",
+        buggy_source=_normalize_whitespace_buggy,
+        function_name="normalize_whitespace",
+        tests=[_nw_spaces, _nw_tabs],
     ),
 ]

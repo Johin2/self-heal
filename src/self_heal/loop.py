@@ -8,9 +8,12 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from self_heal.cache import RepairCache
 from self_heal.diagnose import classify
+from self_heal.events import EventCallback, RepairEvent, emit
 from self_heal.llm import LLMProposer
 from self_heal.propose import build_messages, extract_code
+from self_heal.safety import SafetyConfig, UnsafeProposalError, validate
 from self_heal.types import RepairAttempt, RepairResult
 from self_heal.verify import Test, Verifier, check_tests, check_verifier
 
@@ -31,15 +34,16 @@ _INSTALL_HINT = (
 class RepairLoop:
     """Iteratively repair a failing callable using an LLM.
 
-    The loop catches exceptions, runs optional verifier + tests, then
-    proposes an LLM-backed repair that has access to the full history
-    of prior failed attempts. Same loop powers both `@repair` and `@arepair`.
-
     Example:
         loop = RepairLoop(max_attempts=3)
         result = loop.run(my_function, args=(1, 2))
         if result.succeeded:
             print(result.final_value)
+
+    Optional features (all off by default):
+        - `cache`:    persistent SQLite cache of (source, failure) → repair
+        - `safety`:   AST-based safety checks on every LLM proposal
+        - `on_event`: callback hook for observing repair progress
     """
 
     def __init__(
@@ -48,6 +52,9 @@ class RepairLoop:
         max_attempts: int = 3,
         proposer: LLMProposer | None = None,
         verbose: bool = False,
+        cache: RepairCache | None = None,
+        safety: SafetyConfig | None = None,
+        on_event: EventCallback | None = None,
     ):
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
@@ -55,6 +62,9 @@ class RepairLoop:
         self.verbose = verbose
         self._model = model
         self._proposer: LLMProposer | None = proposer
+        self.cache = cache
+        self.safety = safety
+        self.on_event = on_event
 
     @property
     def proposer(self) -> LLMProposer:
@@ -80,12 +90,7 @@ class RepairLoop:
         tests: list[Test] | None = None,
         prompt_extra: str | None = None,
     ) -> RepairResult:
-        """Call `func(*args, **kwargs)` (sync), repairing until it succeeds.
-
-        - `verify(result)` — predicate / raising check on the return value.
-        - `tests` — each callable takes the current function and raises on failure.
-        - `prompt_extra` — free-form user hint appended to every repair prompt.
-        """
+        """Sync: call `func(*args, **kwargs)`, repairing until it succeeds."""
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -97,16 +102,20 @@ class RepairLoop:
         )
 
         for attempt_num in range(1, self.max_attempts + 1):
+            emit(self.on_event, RepairEvent("attempt_start", attempt_number=attempt_num))
             result, finished = ctx.try_call(attempt_num)
             if finished:
+                emit(self.on_event, RepairEvent("repair_succeeded", attempt_number=attempt_num))
                 return result
 
             if attempt_num == self.max_attempts:
+                emit(self.on_event, RepairEvent("repair_exhausted", attempt_number=attempt_num))
                 return ctx.final_failure()
 
-            raw = self._propose(ctx)
+            raw = self._obtain_repair(ctx)
             ctx.apply_proposal(raw, attempt_num)
 
+        emit(self.on_event, RepairEvent("repair_exhausted"))
         return ctx.final_failure()
 
     async def arun(
@@ -118,9 +127,7 @@ class RepairLoop:
         tests: list[Test] | None = None,
         prompt_extra: str | None = None,
     ) -> RepairResult:
-        """Async variant of `run`. Awaits coroutine functions and runs the
-        (sync) proposer in a thread-pool executor so the event loop stays free.
-        """
+        """Async variant of `run`."""
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -132,31 +139,50 @@ class RepairLoop:
         )
 
         for attempt_num in range(1, self.max_attempts + 1):
+            emit(self.on_event, RepairEvent("attempt_start", attempt_number=attempt_num))
             result, finished = await ctx.atry_call(attempt_num)
             if finished:
+                emit(self.on_event, RepairEvent("repair_succeeded", attempt_number=attempt_num))
                 return result
 
             if attempt_num == self.max_attempts:
+                emit(self.on_event, RepairEvent("repair_exhausted", attempt_number=attempt_num))
                 return ctx.final_failure()
 
-            raw = await asyncio.to_thread(self._propose, ctx)
+            raw = await asyncio.to_thread(self._obtain_repair, ctx)
             ctx.apply_proposal(raw, attempt_num)
 
+        emit(self.on_event, RepairEvent("repair_exhausted"))
         return ctx.final_failure()
 
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
 
-    def _propose(self, ctx: _RunContext) -> str:
+    def _obtain_repair(self, ctx: _RunContext) -> str:
+        """Check cache first, otherwise ask the LLM."""
+        if self.cache is not None:
+            hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
+            if hit is not None:
+                self._log("Cache hit — skipping LLM.")
+                emit(self.on_event, RepairEvent("cache_hit"))
+                return hit
+            emit(self.on_event, RepairEvent("cache_miss"))
+
         self._log("Proposing repair...")
+        emit(self.on_event, RepairEvent("propose_start"))
         system, user = build_messages(
             ctx.original_source,
             ctx.last_failure,
             history=list(ctx.attempts),
             extra=ctx.prompt_extra,
         )
-        return self.proposer.propose(system, user)
+        raw = self.proposer.propose(system, user)
+        emit(
+            self.on_event,
+            RepairEvent("propose_complete", proposed_source=extract_code(raw)),
+        )
+        return raw
 
     def _log(self, message: str) -> None:
         if self.verbose:
@@ -204,9 +230,7 @@ class _RunContext:
         self.prompt_extra = prompt_extra
         self.attempts: list[RepairAttempt] = []
         self.original_source = RepairLoop._safe_source(func)
-        self.last_failure = None  # set on first failure
-
-    # -- sync call path --------------------------------------------------
+        self.last_failure = None
 
     def try_call(self, attempt_num: int) -> tuple[RepairResult, bool]:
         try:
@@ -218,8 +242,6 @@ class _RunContext:
             )
             return None, False
         return self._post_call(value, attempt_num)
-
-    # -- async call path -------------------------------------------------
 
     async def atry_call(self, attempt_num: int) -> tuple[RepairResult, bool]:
         try:
@@ -233,8 +255,6 @@ class _RunContext:
             )
             return None, False
         return self._post_call(value, attempt_num)
-
-    # -- shared -----------------------------------------------------------
 
     def _post_call(
         self, value: Any, attempt_num: int
@@ -251,10 +271,20 @@ class _RunContext:
             self._record_failure(tf, attempt_num)
             return None, False
 
-        # Success — mark the last repair attempt (if any) as the one that worked.
         if self.attempts:
             self.attempts[-1].succeeded = True
             self.loop._log(f"Attempt {attempt_num} succeeded after repair.")
+            if self.loop.cache is not None and self.attempts[-1].proposed_source:
+                self.loop.cache.record(
+                    self.original_source,
+                    self.attempts[-1].failure,
+                    self.attempts[-1].proposed_source,
+                    succeeded=True,
+                )
+            emit(
+                self.loop.on_event,
+                RepairEvent("verify_success", attempt_number=attempt_num),
+            )
 
         return (
             RepairResult(
@@ -271,7 +301,6 @@ class _RunContext:
         self.loop._log(
             f"Attempt {attempt_num} failed: {failure.error_type}: {failure.message}"
         )
-        # Placeholder attempt; proposed_source filled later when we propose a fix.
         self.attempts.append(
             RepairAttempt(
                 attempt_number=attempt_num,
@@ -280,22 +309,53 @@ class _RunContext:
                 succeeded=False,
             )
         )
+        emit(
+            self.loop.on_event,
+            RepairEvent("attempt_failed", attempt_number=attempt_num, failure=failure),
+        )
 
     def apply_proposal(self, raw: str, attempt_num: int) -> None:
         try:
             proposed = extract_code(raw)
+            # Safety check before exec.
+            if self.loop.safety is not None:
+                try:
+                    validate(proposed, self.loop.safety)
+                except UnsafeProposalError as safety_err:
+                    self.loop._log(f"Proposal rejected by safety rails: {safety_err}")
+                    self.attempts[-1].error_after_repair = f"safety: {safety_err}"
+                    emit(
+                        self.loop.on_event,
+                        RepairEvent("safety_violation", error=str(safety_err)),
+                    )
+                    return
             repaired = RepairLoop._recompile(
                 proposed, self.original.__name__, self.original
             )
         except Exception as repair_exc:
             self.loop._log(f"Repair step itself failed: {repair_exc}")
-            # Update the pending attempt with the repair-install error.
             self.attempts[-1].error_after_repair = str(repair_exc)
+            emit(
+                self.loop.on_event,
+                RepairEvent("install_failed", error=str(repair_exc)),
+            )
+            # Record the failed cache entry so we don't serve it again.
+            if self.loop.cache is not None:
+                self.loop.cache.record(
+                    self.original_source,
+                    self.last_failure,
+                    proposed if "proposed" in locals() else raw,
+                    succeeded=False,
+                )
             return
 
         self.attempts[-1].proposed_source = proposed
         self.current = repaired
         self.loop._log("Repair applied, retrying...")
+        emit(
+            self.loop.on_event,
+            RepairEvent("install_success", proposed_source=proposed),
+        )
 
     def final_failure(self) -> RepairResult:
         return RepairResult(
