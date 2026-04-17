@@ -1,5 +1,10 @@
 # self-heal
 
+[![CI](https://github.com/Johin2/self-heal/actions/workflows/ci.yml/badge.svg)](https://github.com/Johin2/self-heal/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/self-heal.svg)](https://pypi.org/project/self-heal/)
+[![Python](https://img.shields.io/pypi/pyversions/self-heal.svg)](https://pypi.org/project/self-heal/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > Automatic repair for failing Python code, powered by any LLM.
 
 When a function fails, `self-heal` catches the exception, analyzes it with an LLM, proposes a repaired version, and retries. One decorator. Works with Claude, OpenAI, Gemini, and 100+ other providers.
