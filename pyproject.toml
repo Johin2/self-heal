@@ -1,5 +1,5 @@
 [project]
-name = "self-heal"
+name = "self-heal-llm"
 version = "0.0.2"
 description = "Automatic repair for failing Python code, powered by any LLM."
 readme = "README.md"

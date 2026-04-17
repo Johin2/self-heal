@@ -1,8 +1,8 @@
 # self-heal
 
 [![CI](https://github.com/Johin2/self-heal/actions/workflows/ci.yml/badge.svg)](https://github.com/Johin2/self-heal/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/self-heal.svg)](https://pypi.org/project/self-heal/)
-[![Python](https://img.shields.io/pypi/pyversions/self-heal.svg)](https://pypi.org/project/self-heal/)
+[![PyPI](https://img.shields.io/pypi/v/self-heal-llm.svg)](https://pypi.org/project/self-heal-llm/)
+[![Python](https://img.shields.io/pypi/pyversions/self-heal-llm.svg)](https://pypi.org/project/self-heal-llm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > Automatic repair for failing Python code, powered by any LLM.
@@ -27,12 +27,14 @@ print(extract_price("€5,49"))     # 5.49    (repaired)
 `self-heal` ships with a Protocol and several optional adapters. Install the adapter(s) you want:
 
 ```bash
-pip install 'self-heal[claude]'    # Anthropic Claude (default)
-pip install 'self-heal[openai]'    # OpenAI + OpenAI-compatible endpoints
-pip install 'self-heal[gemini]'    # Google Gemini
-pip install 'self-heal[litellm]'   # 100+ providers via LiteLLM
-pip install 'self-heal[all]'       # everything
+pip install 'self-heal-llm[claude]'    # Anthropic Claude (default)
+pip install 'self-heal-llm[openai]'    # OpenAI + OpenAI-compatible endpoints
+pip install 'self-heal-llm[gemini]'    # Google Gemini
+pip install 'self-heal-llm[litellm]'   # 100+ providers via LiteLLM
+pip install 'self-heal-llm[all]'       # everything
 ```
+
+> PyPI distribution name is `self-heal-llm` (the short name `self-heal` was blocked by PyPI's similarity check with an unrelated package). The Python import stays `from self_heal import ...`.
 
 ## Provider support
 
