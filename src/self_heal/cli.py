@@ -24,6 +24,7 @@ import importlib.util
 import inspect
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -205,17 +206,31 @@ def _load_module_from_path(path: Path):
 def _wrap_pytest_test(module, fn_name: str, test_fn):
     """Wrap a pytest-style test so self-heal can use it as a verifier.
 
-    Rebinds the target in its module to the candidate repair, runs the
-    test, then restores — mirrors the pytest plugin's approach.
+    Replaces the target function wherever it is bound in the running
+    interpreter (not just in its defining module), runs the test, then
+    restores the original references.
     """
+    original = getattr(module, fn_name)
 
     def verify(candidate_fn):
-        original = getattr(module, fn_name)
-        setattr(module, fn_name, candidate_fn)
+        patched: list[tuple[Any, Any]] = []
+        for mod in list(sys.modules.values()):
+            if mod is None:
+                continue
+            try:
+                if getattr(mod, fn_name, None) is original:
+                    patched.append((mod, original))
+                    setattr(mod, fn_name, candidate_fn)
+            except (AttributeError, ImportError):
+                continue
         try:
             test_fn()
         finally:
-            setattr(module, fn_name, original)
+            for mod, orig in patched:
+                try:
+                    setattr(mod, fn_name, orig)
+                except Exception:  # noqa: BLE001
+                    pass
 
     verify.__name__ = getattr(test_fn, "__name__", "pytest_test")
     return verify

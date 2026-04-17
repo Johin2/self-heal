@@ -7,6 +7,8 @@
 
 > Automatic repair for failing Python code, powered by any LLM.
 
+![self-heal demo](assets/demo.gif)
+
 `self-heal` catches failures, proposes an LLM-guided fix with memory of prior attempts, verifies it, and retries. Works with Claude, OpenAI, Gemini, and 100+ other providers. Sync and async. One decorator.
 
 ```python
