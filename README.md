@@ -113,8 +113,6 @@ AI coding agents fail on a lot of real tasks. The industry's current answer is "
 
 `self-heal` treats repair as a first-class primitive: diagnose the failure, propose a targeted fix, verify, retry. A thin library you can wrap around any Python function or agent tool.
 
-Built on ongoing code-repair research (RepairBench, NeurIPS 2026).
-
 ## How it works
 
 1. **Catch** the exception and capture inputs, traceback, and failure type.
@@ -173,7 +171,7 @@ class MyProposer:
 - [ ] v0.3: async support
 - [ ] v0.4: sandboxed execution
 - [ ] v0.5: repair persistence (learn from past fixes)
-- [ ] v1.0: NeurIPS 2026 paper co-release
+- [ ] v1.0: stable API + benchmark suite
 
 ## Development
 
