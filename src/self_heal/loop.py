@@ -8,11 +8,22 @@ from collections.abc import Callable
 from typing import Any
 
 from self_heal.diagnose import classify
-from self_heal.llm import ClaudeProposer, LLMProposer
+from self_heal.llm import LLMProposer
 from self_heal.propose import build_messages, extract_code
 from self_heal.types import RepairAttempt, RepairResult
 
 logger = logging.getLogger("self_heal")
+
+
+_INSTALL_HINT = (
+    "No LLM proposer configured and the default (ClaudeProposer) could not load.\n"
+    "Install an LLM SDK:\n"
+    "  pip install 'self-heal[claude]'     # Anthropic Claude (default)\n"
+    "  pip install 'self-heal[openai]'     # OpenAI + OpenAI-compatible endpoints\n"
+    "  pip install 'self-heal[gemini]'     # Google Gemini\n"
+    "  pip install 'self-heal[litellm]'    # 100+ providers via LiteLLM\n"
+    "Or pass your own: RepairLoop(proposer=MyProposer())"
+)
 
 
 class RepairLoop:
@@ -35,8 +46,20 @@ class RepairLoop:
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         self.max_attempts = max_attempts
-        self.proposer: LLMProposer = proposer or ClaudeProposer(model=model)
         self.verbose = verbose
+        self._model = model
+        self._proposer: LLMProposer | None = proposer
+
+    @property
+    def proposer(self) -> LLMProposer:
+        """Return the configured proposer, creating the default lazily."""
+        if self._proposer is None:
+            try:
+                from self_heal.llm import ClaudeProposer
+            except ImportError as err:
+                raise ImportError(_INSTALL_HINT) from err
+            self._proposer = ClaudeProposer(model=self._model)
+        return self._proposer
 
     def run(
         self,
