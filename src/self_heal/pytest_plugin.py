@@ -122,6 +122,8 @@ def _heal_candidate(cand: _HealCandidate) -> str | None:
     """Run self-heal on the target function using this test. Returns a
     unified-style textual diff, or None if no repair was needed."""
 
+    import sys
+
     from self_heal import RepairLoop
 
     module_name, _, fn_name = cand.target.rpartition(".")
@@ -133,18 +135,30 @@ def _heal_candidate(cand: _HealCandidate) -> str | None:
     module = importlib.import_module(module_name)
     target_fn = getattr(module, fn_name)
     original_source = inspect.getsource(target_fn)
-
-    # Build a single "test" for self-heal: rebind the target in its module
-    # to the candidate repair, re-run the pytest test body, then restore.
     test_body = cand.test_callable
 
     def verify_via_pytest_body(candidate_fn):
-        original = getattr(module, fn_name)
-        setattr(module, fn_name, candidate_fn)
+        # Patch every module that has a reference to the target function.
+        # Top-level `from mod import fn` binds the original in the importer's
+        # namespace; patching only `module.fn` would leave stale references.
+        patched = []
+        for mod in list(sys.modules.values()):
+            if mod is None:
+                continue
+            try:
+                if getattr(mod, fn_name, None) is target_fn:
+                    patched.append(mod)
+                    setattr(mod, fn_name, candidate_fn)
+            except (AttributeError, ImportError):
+                continue
         try:
             test_body()
         finally:
-            setattr(module, fn_name, original)
+            for mod in patched:
+                try:
+                    setattr(mod, fn_name, target_fn)
+                except Exception:  # noqa: BLE001
+                    pass
 
     verify_via_pytest_body.__name__ = f"pytest::{cand.nodeid}"
 
