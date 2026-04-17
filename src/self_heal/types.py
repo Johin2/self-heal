@@ -6,7 +6,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-FailureKind = Literal["exception", "assertion", "validation", "unknown"]
+FailureKind = Literal[
+    "exception",
+    "assertion",
+    "validation",
+    "verifier",
+    "test",
+    "unknown",
+]
 
 
 class Failure(BaseModel):

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, Literal, TypeVar
 
 from self_heal.llm import LLMProposer
 from self_heal.loop import RepairLoop
+from self_heal.verify import Test, Verifier
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -18,8 +20,13 @@ def repair(
     proposer: LLMProposer | None = None,
     verbose: bool = False,
     on_failure: Literal["raise", "return_none"] = "raise",
+    verify: Verifier | None = None,
+    tests: list[Test] | None = None,
+    prompt_extra: str | None = None,
 ) -> Callable[[F], F]:
     """Wrap a function in an LLM-backed repair loop.
+
+    Works with both sync and async functions; the decorator auto-detects.
 
     Example:
         @repair(max_attempts=3)
@@ -34,13 +41,19 @@ def repair(
         model: Claude model ID used by the default proposer.
         proposer: Custom LLMProposer. Overrides `model` when provided.
         verbose: Log each attempt via the `self_heal` logger.
-        on_failure: What to do when all attempts fail.
-            - "raise": re-raise as RuntimeError with failure context.
-            - "return_none": return None.
+        on_failure: "raise" (default) re-raises as RuntimeError with context,
+            "return_none" returns None.
+        verify: Optional predicate / raising check on the return value. If it
+            returns False or raises, the result is treated as a failure and
+            repair is attempted.
+        tests: Optional list of callables. Each test takes the current function
+            and raises on failure. All tests must pass for the call to succeed.
+        prompt_extra: Free-form user text appended to every repair prompt.
 
     Returns:
-        The wrapped function. The wrapper exposes `last_repair` (RepairResult)
-        and `repair_loop` (RepairLoop instance) as attributes.
+        The wrapped function. The wrapper exposes:
+            - `last_repair` (RepairResult) — set after each call
+            - `repair_loop` (RepairLoop) — the underlying loop
     """
 
     def decorator(func: F) -> F:
@@ -51,29 +64,58 @@ def repair(
             verbose=verbose,
         )
 
+        is_async = inspect.iscoroutinefunction(func)
+
+        if is_async:
+
+            @wraps(func)
+            async def awrapper(*args: Any, **kwargs: Any) -> Any:
+                result = await loop.arun(
+                    func,
+                    args=args,
+                    kwargs=kwargs,
+                    verify=verify,
+                    tests=tests,
+                    prompt_extra=prompt_extra,
+                )
+                awrapper.last_repair = result  # type: ignore[attr-defined]
+                return _finalize(result, func, on_failure)
+
+            awrapper.last_repair = None  # type: ignore[attr-defined]
+            awrapper.repair_loop = loop  # type: ignore[attr-defined]
+            return awrapper  # type: ignore[return-value]
+
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            result = loop.run(func, args=args, kwargs=kwargs)
-            wrapper.last_repair = result  # type: ignore[attr-defined]
-
-            if result.succeeded:
-                return result.final_value
-            if on_failure == "return_none":
-                return None
-
-            if result.attempts:
-                last = result.attempts[-1].failure
-                raise RuntimeError(
-                    f"self-heal exhausted {result.total_attempts} attempts for "
-                    f"'{func.__name__}'. Last failure: "
-                    f"{last.error_type}: {last.message}"
-                )
-            raise RuntimeError(
-                f"self-heal: '{func.__name__}' failed with no recorded attempts"
+            result = loop.run(
+                func,
+                args=args,
+                kwargs=kwargs,
+                verify=verify,
+                tests=tests,
+                prompt_extra=prompt_extra,
             )
+            wrapper.last_repair = result  # type: ignore[attr-defined]
+            return _finalize(result, func, on_failure)
 
         wrapper.last_repair = None  # type: ignore[attr-defined]
         wrapper.repair_loop = loop  # type: ignore[attr-defined]
         return wrapper  # type: ignore[return-value]
 
     return decorator
+
+
+def _finalize(result, func, on_failure: str) -> Any:
+    if result.succeeded:
+        return result.final_value
+    if on_failure == "return_none":
+        return None
+    if result.attempts:
+        last = result.attempts[-1].failure
+        raise RuntimeError(
+            f"self-heal exhausted {result.total_attempts} attempts for "
+            f"'{func.__name__}'. Last failure: {last.error_type}: {last.message}"
+        )
+    raise RuntimeError(
+        f"self-heal: '{func.__name__}' failed with no recorded attempts"
+    )
