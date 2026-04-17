@@ -5,10 +5,14 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from functools import wraps
+from pathlib import Path
 from typing import Any, Literal, TypeVar
 
+from self_heal.cache import RepairCache
+from self_heal.events import EventCallback
 from self_heal.llm import LLMProposer
 from self_heal.loop import RepairLoop
+from self_heal.safety import SafetyConfig, SafetyLevel
 from self_heal.verify import Test, Verifier
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -23,18 +27,14 @@ def repair(
     verify: Verifier | None = None,
     tests: list[Test] | None = None,
     prompt_extra: str | None = None,
+    cache: RepairCache | None = None,
+    cache_path: str | Path | None = None,
+    safety: SafetyConfig | SafetyLevel | None = None,
+    on_event: EventCallback | None = None,
 ) -> Callable[[F], F]:
     """Wrap a function in an LLM-backed repair loop.
 
     Works with both sync and async functions; the decorator auto-detects.
-
-    Example:
-        @repair(max_attempts=3)
-        def my_function(x):
-            return 1 / x
-
-        my_function(0)            # self-heal catches, proposes fix, retries
-        my_function.last_repair   # RepairResult with full attempt history
 
     Args:
         max_attempts: Max total calls (including the first one).
@@ -43,18 +43,35 @@ def repair(
         verbose: Log each attempt via the `self_heal` logger.
         on_failure: "raise" (default) re-raises as RuntimeError with context,
             "return_none" returns None.
-        verify: Optional predicate / raising check on the return value. If it
-            returns False or raises, the result is treated as a failure and
-            repair is attempted.
-        tests: Optional list of callables. Each test takes the current function
-            and raises on failure. All tests must pass for the call to succeed.
+        verify: Optional predicate / raising check on the return value.
+        tests: Optional list of callables; each takes the current function
+            and raises on failure.
         prompt_extra: Free-form user text appended to every repair prompt.
+        cache: Optional pre-built `RepairCache`. Takes priority over
+            `cache_path`.
+        cache_path: Shortcut that creates `RepairCache(cache_path)`.
+        safety: "off" | "moderate" | "strict" | a `SafetyConfig`. Enables
+            AST-based safety checks on every proposal before it is exec'd.
+        on_event: Callback invoked on each repair event (attempt start,
+            failure, cache hit, etc.). See `self_heal.events.RepairEvent`.
 
     Returns:
-        The wrapped function. The wrapper exposes:
+        The wrapped function. Exposes:
             - `last_repair` (RepairResult) — set after each call
             - `repair_loop` (RepairLoop) — the underlying loop
     """
+
+    resolved_cache = cache
+    if resolved_cache is None and cache_path is not None:
+        resolved_cache = RepairCache(cache_path)
+
+    resolved_safety: SafetyConfig | None
+    if safety is None:
+        resolved_safety = None
+    elif isinstance(safety, SafetyConfig):
+        resolved_safety = safety
+    else:
+        resolved_safety = SafetyConfig(level=safety)
 
     def decorator(func: F) -> F:
         loop = RepairLoop(
@@ -62,6 +79,9 @@ def repair(
             max_attempts=max_attempts,
             proposer=proposer,
             verbose=verbose,
+            cache=resolved_cache,
+            safety=resolved_safety,
+            on_event=on_event,
         )
 
         is_async = inspect.iscoroutinefunction(func)

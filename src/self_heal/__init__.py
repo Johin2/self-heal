@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from self_heal.cache import RepairCache
 from self_heal.core import repair
+from self_heal.events import EventCallback, RepairEvent
 from self_heal.llm import LLMProposer
 from self_heal.loop import RepairLoop
+from self_heal.safety import SafetyConfig, UnsafeProposalError
 from self_heal.types import Failure, RepairAttempt, RepairResult
 from self_heal.verify import Test, Verifier, check_tests, check_verifier
 
@@ -18,7 +21,7 @@ if TYPE_CHECKING:
         OpenAIProposer,
     )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 def __getattr__(name: str) -> Any:
@@ -31,15 +34,20 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "ClaudeProposer",
+    "EventCallback",
     "Failure",
     "GeminiProposer",
     "LLMProposer",
     "LiteLLMProposer",
     "OpenAIProposer",
     "RepairAttempt",
+    "RepairCache",
+    "RepairEvent",
     "RepairLoop",
     "RepairResult",
+    "SafetyConfig",
     "Test",
+    "UnsafeProposalError",
     "Verifier",
     "check_tests",
     "check_verifier",

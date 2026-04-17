@@ -1,6 +1,6 @@
 [project]
 name = "self-heal-llm"
-version = "0.1.0"
+version = "0.2.0"
 description = "Automatic repair for failing Python code, powered by any LLM."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -61,6 +61,12 @@ dev = [
 Homepage = "https://github.com/Johin2/self-heal"
 Repository = "https://github.com/Johin2/self-heal"
 Issues = "https://github.com/Johin2/self-heal/issues"
+
+[project.scripts]
+self-heal = "self_heal.cli:main"
+
+[project.entry-points.pytest11]
+self_heal = "self_heal.pytest_plugin"
 
 [build-system]
 requires = ["hatchling"]
