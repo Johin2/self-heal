@@ -37,7 +37,7 @@ On 19 small Python tasks with plausible bugs (price parsing, palindrome, flatten
 
 *Gemini 2.5 Flash, max 3 attempts, v0.2 harness. Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash`. Full task list in [`benchmarks/tasks.py`](benchmarks/tasks.py).*
 
-The 6 tasks where self-heal wins — `extract_price`, `is_palindrome`, `count_vowels`, `levenshtein`, `format_duration`, `is_anagram` — all share a pattern: the first proposed fix handles one edge case but misses another. Memory of the failed attempt plus test feedback lets the second proposal cover both. The remaining 4 extra LLM calls (21 vs 17) are the price for +6 tasks repaired — **~30% more calls for +46% more wins.**
+The 6 tasks where self-heal wins (`extract_price`, `is_palindrome`, `count_vowels`, `levenshtein`, `format_duration`, `is_anagram`) all share a pattern: the first proposed fix handles one edge case but misses another. Memory of the failed attempt plus test feedback lets the second proposal cover both. The remaining 4 extra LLM calls (21 vs 17) are the price for +6 tasks repaired: **~30% more calls for +46% more wins.**
 
 ## Install
 
@@ -67,7 +67,7 @@ pip install 'self-heal-llm[all]'       # everything
 ### Multi-turn repair with memory
 Every proposal sees the history of *prior failed attempts* so the LLM can't repeat the same mistake. This is the single biggest quality win over naive retry.
 
-### Verifiers — `verify=callable`
+### Verifiers: `verify=callable`
 Catch bad *return values*, not just exceptions:
 
 ```python
@@ -77,7 +77,7 @@ def extract_price(text): ...
 
 If the predicate returns `False` or raises, self-heal treats it as a failure and repairs.
 
-### Test-driven repair — `tests=[...]`
+### Test-driven repair: `tests=[...]`
 Give self-heal a test suite; it repairs until every test passes:
 
 ```python
@@ -96,13 +96,13 @@ The decorator auto-detects `async def` and awaits correctly; the LLM call runs i
 async def fetch_and_parse(url: str) -> dict: ...
 ```
 
-### Prompt customization — `prompt_extra="..."`
+### Prompt customization: `prompt_extra="..."`
 Append domain-specific instructions to every repair prompt. Useful for "always handle None inputs" or "use only the standard library."
 
 ### Bring your own LLM
 Implement the `LLMProposer` Protocol (`def propose(self, system: str, user: str) -> str`) and pass it in.
 
-### Repair cache — skip the LLM when you've seen it before
+### Repair cache: skip the LLM when you've seen it before
 ```python
 from self_heal import repair
 
@@ -111,7 +111,7 @@ def my_fn(...): ...
 ```
 First repair hits the LLM. Subsequent identical failures are served from SQLite (zero latency, zero cost). Keyed on source hash + failure signature with whitespace and memory-address normalization.
 
-### AST safety rails — block dangerous proposals
+### AST safety rails: block dangerous proposals
 ```python
 @repair(safety="moderate")   # default off; "moderate" | "strict" | SafetyConfig(...)
 def my_fn(...): ...
@@ -128,9 +128,9 @@ def watch(event: RepairEvent):
 @repair(on_event=watch)
 def my_fn(...): ...
 ```
-Hooks fire on attempt start, failure, propose start/complete, install, cache hit/miss, safety violation, verify, and repair completion — perfect for agent UIs and observability pipelines.
+Hooks fire on attempt start, failure, propose start/complete, install, cache hit/miss, safety violation, verify, and repair completion. Perfect for agent UIs and observability pipelines.
 
-### pytest plugin — `pytest --heal`
+### pytest plugin: `pytest --heal`
 Mark any test with `@pytest.mark.heal(target="mymod.my_fn")`. When it fails with `--heal`, self-heal loads the target, repairs it using the test as verification, and prints the proposed diff at the end of the session.
 
 ```python
@@ -145,7 +145,7 @@ def test_rupees():
 pytest --heal
 ```
 
-### CLI — heal a function from the command line
+### CLI: heal a function from the command line
 ```bash
 self-heal heal mymod.py::extract_price \
     --test tests/test_mymod.py::test_rupees \
@@ -179,9 +179,9 @@ from self_heal import repair
     proposer=None,               # or ClaudeProposer / OpenAIProposer / ...
     verbose=False,
     on_failure="raise",          # or "return_none"
-    verify=None,                 # Callable[[Any], bool] — raise or False → repair
+    verify=None,                 # Callable[[Any], bool]; raise or False triggers repair
     tests=None,                  # list[Callable[[Callable], Any]]
-    prompt_extra=None,           # str — extra user instructions in every prompt
+    prompt_extra=None,           # str; extra user instructions in every prompt
 )
 def my_fn(...): ...
 
@@ -229,7 +229,7 @@ def my_fn(...): ...
 ```python
 from self_heal.llm import OpenAIProposer
 
-# OpenRouter — hundreds of models through one key
+# OpenRouter: hundreds of models through one key
 OpenAIProposer(
     model="google/gemini-2.5-pro",
     base_url="https://openrouter.ai/api/v1",
@@ -267,7 +267,7 @@ LiteLLMProposer(model="cohere/command-r-plus")
 ## Roadmap
 
 - [x] v0.0.1: core repair loop + decorator + Claude backend
-- [x] v0.0.2: OpenAI, Gemini, LiteLLM adapters — works with any LLM
+- [x] v0.0.2: OpenAI, Gemini, LiteLLM adapters; works with any LLM
 - [x] v0.1.0: multi-turn memory, verifiers, test-driven repair, async, benchmark harness
 - [x] **v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks**
 - [ ] v0.3: streaming token events + async proposers for Claude/OpenAI/Gemini
