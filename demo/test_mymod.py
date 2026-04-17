@@ -1,5 +1,4 @@
 import pytest
-
 from mymod import extract_price
 
 
