@@ -92,18 +92,51 @@ def _read_testcases(path: Path) -> list[tuple[list, object]]:
     return cases
 
 
-def _make_test(case_inputs: list, expected: object) -> Callable:
+def _make_test(
+    case_inputs: list, expected: object, timeout: float = 5.0
+) -> Callable:
+    """Build a test that calls fn(*inputs) and asserts the expected value.
+
+    Some QuixBugs bugs (notably `bitcount` with `n ^= n - 1`) produce
+    infinite loops on certain inputs. We run the call in a daemon thread
+    with a timeout so the benchmark stays forward-progressing even when
+    the buggy source hangs. The hung thread is abandoned (daemon) — it
+    keeps a CPU busy until the interpreter exits, but does not block the
+    harness.
+    """
+    import threading
+
     def test(fn):
-        result = fn(*case_inputs)
-        # QuixBugs sometimes returns generators; materialize for comparison.
-        try:
-            iter(result)
-            if not isinstance(result, (str, bytes, list, tuple, dict, set)):
-                result = list(result)
-        except TypeError:
-            pass
-        assert result == expected, (
-            f"inputs={case_inputs!r} expected={expected!r} got={result!r}"
+        result_holder: list = []
+        exc_holder: list = []
+
+        def call() -> None:
+            try:
+                value = fn(*case_inputs)
+                try:
+                    iter(value)
+                    if not isinstance(value, (str, bytes, list, tuple, dict, set)):
+                        value = list(value)
+                except TypeError:
+                    pass
+                result_holder.append(value)
+            except BaseException as err:
+                exc_holder.append(err)
+
+        t = threading.Thread(target=call, daemon=True)
+        t.start()
+        t.join(timeout=timeout)
+        if t.is_alive():
+            raise AssertionError(
+                f"timeout after {timeout}s on inputs={case_inputs!r}"
+            )
+        if exc_holder:
+            raise exc_holder[0]
+        if not result_holder:
+            raise AssertionError("no result produced")
+        got = result_holder[0]
+        assert got == expected, (
+            f"inputs={case_inputs!r} expected={expected!r} got={got!r}"
         )
 
     test.__name__ = "quixbugs_case"
