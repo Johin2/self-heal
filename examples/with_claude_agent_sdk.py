@@ -1,9 +1,7 @@
-"""Make any Claude Agent SDK tool self-healing.
+"""Make any Claude Agent SDK tool self-healing (first-class integration).
 
-Wrap your tool function with `@repair` BEFORE (or after — order doesn't
-matter for the outer wrapping) the agent's tool decorator. Failures in
-the tool body, including verifier/test failures, trigger an automatic
-repair loop transparent to the agent.
+Use the `healing_tool` decorator to register an async function as both a
+Claude Agent SDK tool and a self-healing callable in one step.
 
 Install:
     pip install 'self-heal-llm[claude]' claude-agent-sdk
@@ -13,33 +11,46 @@ Requires ANTHROPIC_API_KEY.
 
 from __future__ import annotations
 
-# This example shows the INTEGRATION PATTERN — adapt imports and tool-
-# registration syntax to the exact Claude Agent SDK version you're using.
-#
-# from claude_agent_sdk import tool, create_sdk_mcp_server, ClaudeSDKClient
-from self_heal import repair
+import asyncio
+
+from self_heal.integrations.claude_agent_sdk import healing_tool
 
 
-def test_handles_dollar_comma(fn):
-    assert fn({"text": "$1,299"}) == 1299.0
+def test_dollar_comma(fn):
+    result = asyncio.run(fn({"text": "$1,299"}))
+    text = result["content"][0]["text"]
+    assert "1299" in text
 
 
-def test_handles_rupee(fn):
-    assert fn({"text": "₹500"}) == 500.0
+def test_rupee(fn):
+    result = asyncio.run(fn({"text": "Rs 500"}))
+    text = result["content"][0]["text"]
+    assert "500" in text
 
 
-# @tool("price_from_text", "Extract a price from messy text", {"text": str})
-@repair(
+@healing_tool(
+    "price_from_text",
+    "Extract a numeric price from messy text (handles $, commas, rupees).",
+    {"text": str},
     max_attempts=3,
-    verify=lambda r: isinstance(r, float) and r > 0,
-    tests=[test_handles_dollar_comma, test_handles_rupee],
+    verify=lambda r: isinstance(r, dict) and not r.get("is_error"),
+    tests=[test_dollar_comma, test_rupee],
 )
-async def price_from_text(args: dict) -> float:
-    """A tool the agent can call. Self-healing under the hood."""
+async def price_from_text(args):
+    """Naive: only handles '$X.YY'. Self-heal will repair on first call
+    against a test or verifier failure."""
     text = args["text"]
-    return float(text.replace("$", ""))  # naive
+    return {
+        "content": [{"type": "text", "text": str(float(text.replace("$", "")))}]
+    }
 
 
-# When the agent invokes this tool with arbitrary user input,
-# self-heal will repair the parser until it passes both tests
-# AND the verifier — no manual error handling needed.
+# `price_from_text` is now an SdkMcpTool. Register it with an SDK MCP
+# server the usual way:
+#
+#     from claude_agent_sdk import create_sdk_mcp_server, ClaudeSDKClient
+#     server = create_sdk_mcp_server("demo", tools=[price_from_text])
+#     client = ClaudeSDKClient(mcp_servers={"demo": server})
+#
+# The agent sees a standard tool; under the hood, self-heal repairs the
+# function until both tests and the verifier pass.
