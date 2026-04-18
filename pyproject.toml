@@ -1,6 +1,6 @@
 [project]
 name = "self-heal-llm"
-version = "0.4.1"
+version = "0.4.2"
 description = "Automatic repair for failing Python code, powered by any LLM."
 readme = "README.md"
 requires-python = ">=3.10"
