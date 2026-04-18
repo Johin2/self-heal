@@ -10,7 +10,9 @@ import asyncio
 
 import pytest
 
-from self_heal.integrations.claude_agent_sdk import healing_tool
+pytest.importorskip("claude_agent_sdk")
+
+from self_heal.integrations.claude_agent_sdk import healing_tool  # noqa: E402
 
 
 class ScriptedProposer:

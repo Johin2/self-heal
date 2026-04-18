@@ -55,6 +55,9 @@ dev = [
     "openai>=1.40.0",
     "google-genai>=0.3.0",
     "litellm>=1.0.0",
+    # integration packages (tested in CI; optional for end users)
+    "claude-agent-sdk>=0.1.0",
+    "langchain-core>=0.3.0",
 ]
 
 [project.urls]

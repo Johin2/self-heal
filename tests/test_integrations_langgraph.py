@@ -5,7 +5,11 @@ No network calls. Uses ScriptedProposer for the repair loop.
 
 from __future__ import annotations
 
-from self_heal.integrations.langgraph import healing_tool
+import pytest
+
+pytest.importorskip("langchain_core")
+
+from self_heal.integrations.langgraph import healing_tool  # noqa: E402
 
 
 class ScriptedProposer:
