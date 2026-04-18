@@ -44,6 +44,8 @@ class _HealCandidate:
 @dataclass
 class _HealSession:
     enabled: bool = False
+    apply: bool = False
+    apply_force: bool = False
     candidates: list[_HealCandidate] = field(default_factory=list)
 
 
@@ -56,6 +58,21 @@ def pytest_addoption(parser) -> None:
         help="After failing tests marked with @pytest.mark.heal(target=...), "
         "run self-heal on the target function and print proposed fixes.",
     )
+    group.addoption(
+        "--heal-apply",
+        action="store_true",
+        default=False,
+        help="Write accepted repairs back to disk (implies --heal). Creates "
+        "a .py.heal-backup next to each modified file. Refuses to modify "
+        "git-dirty files unless --heal-apply-force is given.",
+    )
+    group.addoption(
+        "--heal-apply-force",
+        action="store_true",
+        default=False,
+        help="Allow --heal-apply to modify files that have uncommitted "
+        "changes. Use with care.",
+    )
 
 
 def pytest_configure(config) -> None:
@@ -64,8 +81,13 @@ def pytest_configure(config) -> None:
         "heal(target): mark a test whose failure should trigger self-heal "
         "on the named target function (e.g. 'mymodule.myfunc').",
     )
+    apply = bool(config.getoption("--heal-apply"))
+    # --heal-apply implies --heal
+    enabled = bool(config.getoption("--heal")) or apply
     config._self_heal_session = _HealSession(  # type: ignore[attr-defined]
-        enabled=bool(config.getoption("--heal"))
+        enabled=enabled,
+        apply=apply,
+        apply_force=bool(config.getoption("--heal-apply-force")),
     )
 
 
@@ -105,25 +127,72 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
         tr.write_line(f"\n▸ {cand.nodeid}")
         tr.write_line(f"  target: {cand.target}")
         try:
-            diff = _heal_candidate(cand)
+            outcome = _heal_candidate(cand)
         except Exception as exc:  # noqa: BLE001
             tr.write_line(f"  ✗ could not heal: {exc}", red=True)
             continue
-        if diff is None:
+        if outcome is None:
             tr.write_line("  (no repair needed — target already passes test)")
             continue
+
+        diff, original_source, repaired_source, src_path = outcome
         tr.write_line("  proposed repair:", green=True)
         for line in diff.splitlines():
             tr.write_line(f"    {line}")
 
+        if session.apply:
+            _apply_or_report(
+                tr, cand, src_path, original_source, repaired_source,
+                force=session.apply_force,
+            )
+
     tr.write_sep("=", "self-heal: end", purple=True)
 
 
-def _heal_candidate(cand: _HealCandidate) -> str | None:
-    """Run self-heal on the target function using this test. Returns a
-    unified-style textual diff, or None if no repair was needed."""
+def _apply_or_report(
+    tr, cand: _HealCandidate, src_path, original_source: str,
+    repaired_source: str, force: bool,
+) -> None:
+    from self_heal._patch import PatchError, apply_function_patch, is_git_dirty
+
+    if src_path is None:
+        tr.write_line(
+            f"  ✗ APPLY skipped: could not locate source file for {cand.target}",
+            red=True,
+        )
+        return
+
+    if not force and is_git_dirty(src_path):
+        tr.write_line(
+            f"  ✗ APPLY skipped: {src_path} has uncommitted changes "
+            "(use --heal-apply-force to override)",
+            red=True,
+        )
+        return
+
+    _, _, fn_name = cand.target.rpartition(".")
+    try:
+        backup = apply_function_patch(
+            src_path, fn_name, original_source, repaired_source
+        )
+    except PatchError as exc:
+        tr.write_line(f"  ✗ APPLY failed: {exc}", red=True)
+        return
+
+    tr.write_line(
+        f"  ✓ APPLIED to {src_path} (backup: {backup.name})", green=True
+    )
+
+
+def _heal_candidate(cand: _HealCandidate):
+    """Run self-heal on the target function using this test.
+
+    Returns a 4-tuple (diff_text, original_source, repaired_source, src_path),
+    or None if no repair was needed.
+    """
 
     import sys
+    from pathlib import Path
 
     from self_heal import RepairLoop
 
@@ -136,6 +205,13 @@ def _heal_candidate(cand: _HealCandidate) -> str | None:
     module = importlib.import_module(module_name)
     target_fn = getattr(module, fn_name)
     original_source = inspect.getsource(target_fn)
+    src_path: Path | None = None
+    try:
+        raw_file = inspect.getsourcefile(target_fn)
+        if raw_file:
+            src_path = Path(raw_file).resolve()
+    except (OSError, TypeError):
+        src_path = None
     test_body = cand.test_callable
 
     def verify_via_pytest_body(candidate_fn):
@@ -178,7 +254,7 @@ def _heal_candidate(cand: _HealCandidate) -> str | None:
     if winning is None:
         return None
 
-    return _format_diff(original_source, winning)
+    return (_format_diff(original_source, winning), original_source, winning, src_path)
 
 
 def _format_diff(before: str, after: str) -> str:
