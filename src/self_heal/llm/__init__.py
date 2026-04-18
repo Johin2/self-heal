@@ -25,10 +25,21 @@ if TYPE_CHECKING:
 class LLMProposer(Protocol):
     """Anything that turns a (system, user) prompt into a repair proposal.
 
-    Implement this protocol to plug any LLM into self-heal.
+    Implement this protocol to plug any LLM into self-heal. `propose` is
+    required; `apropose` and `propose_stream` are optional and improve
+    async / streaming paths when present.
     """
 
     def propose(self, system: str, user: str) -> str: ...
+
+    # Optional: native async. When absent, RepairLoop.arun falls back to
+    # asyncio.to_thread(propose). Declared here for static reference;
+    # concrete duck-typing is checked with hasattr.
+    # async def apropose(self, system: str, user: str) -> str: ...
+
+    # Optional: streaming. When absent, RepairLoop treats propose() as a
+    # single-chunk generator.
+    # def propose_stream(self, system: str, user: str) -> Iterator[str]: ...
 
 
 def __getattr__(name: str) -> Any:

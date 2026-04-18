@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 try:
-    from litellm import completion
+    from litellm import acompletion, completion
 except ImportError as _err:  # pragma: no cover
     raise ImportError(
         "LiteLLMProposer requires the `litellm` package. "
@@ -42,7 +42,7 @@ class LiteLLMProposer:
         self.max_tokens = max_tokens
         self.extra_kwargs = extra_kwargs
 
-    def propose(self, system: str, user: str) -> str:
+    def _params(self, system: str, user: str, **extra) -> dict:
         params: dict = {
             "model": self.model,
             "messages": [
@@ -50,9 +50,33 @@ class LiteLLMProposer:
                 {"role": "user", "content": user},
             ],
             **self.extra_kwargs,
+            **extra,
         }
         if self.max_tokens is not None:
             params["max_tokens"] = self.max_tokens
+        return params
 
-        response = completion(**params)
+    def propose(self, system: str, user: str) -> str:
+        response = completion(**self._params(system, user))
         return response.choices[0].message.content or ""
+
+    async def apropose(self, system: str, user: str) -> str:
+        response = await acompletion(**self._params(system, user))
+        return response.choices[0].message.content or ""
+
+    def propose_stream(self, system: str, user: str):
+        for chunk in completion(**self._params(system, user, stream=True)):
+            if not chunk.choices:
+                continue
+            delta = getattr(chunk.choices[0].delta, "content", None)
+            if delta:
+                yield delta
+
+    async def apropose_stream(self, system: str, user: str):
+        stream = await acompletion(**self._params(system, user, stream=True))
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = getattr(chunk.choices[0].delta, "content", None)
+            if delta:
+                yield delta

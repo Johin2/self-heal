@@ -39,12 +39,33 @@ class GeminiProposer:
         )
         self.client = genai.Client(api_key=key)
 
+    def _config(self, system: str):
+        return genai_types.GenerateContentConfig(system_instruction=system)
+
     def propose(self, system: str, user: str) -> str:
         response = self.client.models.generate_content(
-            model=self.model,
-            contents=user,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=system,
-            ),
+            model=self.model, contents=user, config=self._config(system),
         )
         return response.text or ""
+
+    async def apropose(self, system: str, user: str) -> str:
+        response = await self.client.aio.models.generate_content(
+            model=self.model, contents=user, config=self._config(system),
+        )
+        return response.text or ""
+
+    def propose_stream(self, system: str, user: str):
+        for chunk in self.client.models.generate_content_stream(
+            model=self.model, contents=user, config=self._config(system),
+        ):
+            text = getattr(chunk, "text", None)
+            if text:
+                yield text
+
+    async def apropose_stream(self, system: str, user: str):
+        async for chunk in await self.client.aio.models.generate_content_stream(
+            model=self.model, contents=user, config=self._config(system),
+        ):
+            text = getattr(chunk, "text", None)
+            if text:
+                yield text
