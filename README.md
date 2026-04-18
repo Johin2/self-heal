@@ -28,16 +28,25 @@ extract_price("$12.99")   # triggers repair loop until ALL tests pass
 
 ## Benchmark
 
-On 19 small Python tasks with plausible bugs (price parsing, palindrome, flatten, roman numerals, camelCase-to-snake_case, Levenshtein, anagram, duration formatting, ...), each task repaired against a hand-written test suite:
+Two suites, both run against Gemini 2.5 Flash, 3 max attempts, v0.4 harness.
+
+**Default suite** (19 hand-written bugs: price parsing, palindrome, flatten, roman numerals, camelCase-to-snake_case, Levenshtein, anagram, duration formatting, ...)
 
 | Strategy | Tasks passed | Success rate | LLM calls |
 |---|---:|---:|---:|
-| Naive single-shot repair | 13 / 19 | 68% | 17 |
-| **self-heal (multi-turn + memory)** | **19 / 19** | **100%** | 21 |
+| Naive single-shot repair | 16 / 19 | 84% | 17 |
+| **self-heal (multi-turn + memory)** | **18 / 19** | **95%** | 21 |
 
-*Gemini 2.5 Flash, max 3 attempts, v0.2 harness. Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash`. Full task list in [`benchmarks/tasks.py`](benchmarks/tasks.py). For the QuixBugs repair benchmark (40 programs, industry-standard): `self-heal bench --suite quixbugs`. Community-submitted results live in [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md).*
+**QuixBugs** (31 classic one-line bugs; 9 graph/tree programs skipped by the loader for custom-deserialization reasons)
 
-The 6 tasks where self-heal wins (`extract_price`, `is_palindrome`, `count_vowels`, `levenshtein`, `format_duration`, `is_anagram`) all share a pattern: the first proposed fix handles one edge case but misses another. Memory of the failed attempt plus test feedback lets the second proposal cover both. The remaining 4 extra LLM calls (21 vs 17) are the price for +6 tasks repaired: **~30% more calls for +46% more wins.**
+| Strategy | Tasks passed | Success rate | LLM calls |
+|---|---:|---:|---:|
+| Naive single-shot repair | 27 / 31 | 87% | 30 |
+| **self-heal (multi-turn + memory)** | **29 / 31** | **94%** | 35 |
+
+Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash` (default) or `--suite quixbugs`. Full numbers, historical rows, and how to contribute your own in [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md). Task source in [`benchmarks/tasks.py`](benchmarks/tasks.py).
+
+The +2 tasks on each suite share a pattern: the first proposed fix handles one edge case but misses another. Memory of the failed attempt plus test feedback lets the second proposal cover both. Roughly 20% more LLM calls for the additional wins. As frontier models keep improving the naive floor rises and this delta compresses; earlier runs against Gemini 2.5 Flash had naive at 68% instead of 84%, which is honest signal not cherry-picked.
 
 ## Install
 
@@ -352,8 +361,9 @@ def parse_price(text: str) -> float:
 - [x] v0.1.0: multi-turn memory, verifiers, test-driven repair, async, benchmark harness
 - [x] v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks
 - [x] v0.3.0: subprocess sandbox, `pytest --heal-apply`, QuixBugs benchmark, local-model sweep tooling
-- [x] **v0.4.0: streaming token events (`propose_chunk`), native async proposers (`apropose`) for all four adapters**
-- [ ] v0.5: wasm sandbox
+- [x] v0.4.0: streaming token events (`propose_chunk`), native async proposers (`apropose`) for all four adapters
+- [x] **v0.4.1: sandbox preserves custom exceptions from proposals; `is_git_dirty` fails closed on timeout; Claude Agent SDK and LangChain/LangGraph first-class integrations**
+- [ ] v0.5: wasm sandbox, warm subprocess worker pool, first-class CrewAI / OpenAI Agents SDK integrations
 - [ ] v1.0: stable API + extended benchmark suite (HumanEval-Fix, Refactory)
 
 ## Deeper docs
