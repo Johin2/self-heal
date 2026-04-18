@@ -7,6 +7,7 @@ import pytest
 from self_heal import RepairLoop, SafetyConfig
 from self_heal.sandbox import (
     SandboxError,
+    SandboxProposalError,
     SubprocessSandbox,
     make_sandboxed_callable,
 )
@@ -90,6 +91,27 @@ def test_repair_loop_uses_sandbox_when_configured():
     assert result.final_value == 0
     # The winning callable is a sandbox wrapper.
     assert hasattr(result.attempts[-1], "proposed_source")
+
+
+def test_sandbox_surfaces_custom_exception_via_fallback():
+    """Custom exception types defined inside the sandboxed source can't
+    be unpickled on the parent side. Instead of a cryptic
+    'sandbox output not readable' error, the parent must raise
+    SandboxProposalError with the original type name, message, and
+    traceback preserved as strings."""
+    sb = SubprocessSandbox(timeout=10.0)
+    src = (
+        "class MyDomainError(Exception):\n"
+        "    pass\n"
+        "\n"
+        "def boom():\n"
+        "    raise MyDomainError('custom crash')\n"
+    )
+    with pytest.raises(SandboxProposalError) as exc_info:
+        sb.run(src, "boom", (), {})
+    assert exc_info.value.type_name == "MyDomainError"
+    assert "custom crash" in exc_info.value.original_message
+    assert "MyDomainError" in exc_info.value.original_traceback
 
 
 def test_repair_loop_without_sandbox_stays_in_process():
