@@ -327,6 +327,7 @@ Examples in [`examples/`](examples):
 - [`with_claude_agent_sdk.py`](examples/with_claude_agent_sdk.py)
 - [`with_openai_agents.py`](examples/with_openai_agents.py)
 - [`with_langchain.py`](examples/with_langchain.py)
+- [`with_crewai.py`](examples/with_crewai.py)
 
 ## Safety
 
