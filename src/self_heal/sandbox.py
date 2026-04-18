@@ -32,7 +32,12 @@ import textwrap
 from collections.abc import Callable
 from typing import Any
 
-__all__ = ["SandboxError", "SubprocessSandbox", "make_sandboxed_callable"]
+__all__ = [
+    "SandboxError",
+    "SandboxProposalError",
+    "SubprocessSandbox",
+    "make_sandboxed_callable",
+]
 
 
 class SandboxError(RuntimeError):
@@ -67,11 +72,28 @@ _WORKER_SOURCE = textwrap.dedent(
             sys.exit(0)
         value = fn(*data["args"], **data["kwargs"])
     except BaseException as exc:
+        # Always send a string-based fallback alongside the pickled
+        # exception so the parent can reconstruct a meaningful error
+        # even when the exception class only exists in this sandbox
+        # (e.g. a custom Exception defined in the proposed source).
+        type_name = type(exc).__name__
+        message = str(exc)
+        tb_str = traceback.format_exc()
+        payload = {
+            "ok": False,
+            "exc_type_name": type_name,
+            "exc_message": message,
+            "exc_traceback": tb_str,
+        }
         try:
-            _emit({"ok": False, "exception": exc})
+            # Try to round-trip the real exception; if the class isn't
+            # resolvable on the parent side, the parent will fall back
+            # to the string-based fields above.
+            pickle.dumps(exc)
+            payload["exception"] = exc
         except Exception:
-            _emit({"ok": False, "sandbox_error":
-                   f"{type(exc).__name__}: {exc}\\n{traceback.format_exc()}"})
+            pass
+        _emit(payload)
         sys.exit(0)
 
     try:
@@ -81,6 +103,21 @@ _WORKER_SOURCE = textwrap.dedent(
                f"return value not pickleable: {exc}"})
     """
 ).strip()
+
+
+class SandboxProposalError(RuntimeError):
+    """Raised in the parent when a sandboxed proposal raised an
+    exception whose class is not available outside the sandbox.
+
+    Preserves the original type name, message, and traceback as plain
+    strings so the repair loop still has diagnostic signal.
+    """
+
+    def __init__(self, type_name: str, message: str, traceback_str: str):
+        super().__init__(f"{type_name}: {message}")
+        self.type_name = type_name
+        self.original_message = message
+        self.original_traceback = traceback_str
 
 
 class SubprocessSandbox:
@@ -140,6 +177,12 @@ class SubprocessSandbox:
             raise SandboxError(result["sandbox_error"])
         if "exception" in result:
             raise result["exception"]
+        if "exc_type_name" in result:
+            raise SandboxProposalError(
+                result.get("exc_type_name", "Exception"),
+                result.get("exc_message", ""),
+                result.get("exc_traceback", ""),
+            )
         raise SandboxError(f"unexpected sandbox result: {result!r}")
 
 
