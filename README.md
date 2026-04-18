@@ -284,7 +284,29 @@ LiteLLMProposer(model="cohere/command-r-plus")
 
 ## Agent framework integration
 
-`self-heal` composes with any Python agent framework. Wrap the tool's underlying callable with `@repair` and register the result as usual. Examples in [`examples/`](examples):
+`self-heal` composes with any Python agent framework. For Claude Agent SDK there's a first-class integration (one decorator instead of two); for everything else, wrap the tool's underlying callable with `@repair` and register the result as usual.
+
+### Claude Agent SDK (first-class)
+
+```python
+from self_heal.integrations.claude_agent_sdk import healing_tool
+
+@healing_tool(
+    "price_from_text",
+    "Extract a price from messy text.",
+    {"text": str},
+    verify=lambda r: isinstance(r, dict) and not r.get("is_error"),
+)
+async def price_from_text(args):
+    text = args["text"]
+    return {"content": [{"type": "text", "text": str(float(text.replace("$", "")))}]}
+```
+
+`healing_tool` takes both the Claude Agent SDK's `@tool` parameters and all of `@repair`'s parameters. The result is an `SdkMcpTool` ready to register with `create_sdk_mcp_server(...)`. Requires `pip install 'self-heal-llm[claude]' claude-agent-sdk`.
+
+### Other frameworks (decorator stacking)
+
+Examples in [`examples/`](examples):
 
 - [`with_claude_agent_sdk.py`](examples/with_claude_agent_sdk.py)
 - [`with_openai_agents.py`](examples/with_openai_agents.py)
