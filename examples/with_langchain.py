@@ -1,34 +1,52 @@
-"""Make any LangChain tool self-healing.
+"""Make any LangChain / LangGraph tool self-healing (first-class integration).
 
-LangChain's `@tool` decorator wraps a function as a Tool. Stack `@repair`
-inside so the underlying callable heals itself under load.
+Use the `healing_tool` decorator to register a function as both a
+LangChain `BaseTool` and a self-healing callable in one step. Works
+inside LangChain chains, LangGraph agents, or anywhere a LangChain
+tool is expected.
 
 Install:
-    pip install 'self-heal-llm[claude]' langchain-core
+    pip install 'self-heal-llm[claude]' langchain-core langgraph
 
 Requires ANTHROPIC_API_KEY.
 """
 
 from __future__ import annotations
 
-# from langchain_core.tools import tool  # langchain-core
-from self_heal import repair
+from self_heal.integrations.langgraph import healing_tool
 
 
-def test_roundtrips_positive(fn):
-    assert fn(5) == 25
+def test_dollar_comma(fn):
+    assert fn.invoke({"text": "$1,299"}) == 1299.0
 
 
-# @tool
-@repair(
+def test_rupee(fn):
+    assert fn.invoke({"text": "Rs 500"}) == 500.0
+
+
+@healing_tool(
+    "price_from_text",
+    description="Extract a numeric price from messy text (handles $, commas, rupees).",
     max_attempts=3,
-    verify=lambda r: isinstance(r, int) and r >= 0,
-    tests=[test_roundtrips_positive],
+    verify=lambda r: isinstance(r, float) and r > 0,
+    tests=[test_dollar_comma, test_rupee],
 )
-def square(n: int) -> int:
-    """Square a number. Self-healing."""
-    return n + n  # naive: addition instead of multiplication
+def price_from_text(text: str) -> float:
+    """Naive: only handles '$X.YY'. Self-heal will repair on first
+    call against a test or verifier failure."""
+    return float(text.replace("$", ""))
 
 
-# The LangChain agent calls the Tool; self-heal silently heals the
-# underlying function until it passes both the verifier and the test.
+# `price_from_text` is now a LangChain BaseTool. Bind it to an LLM or
+# use it in a LangGraph agent the usual way:
+#
+#     from langgraph.prebuilt import create_react_agent
+#     from langchain_anthropic import ChatAnthropic
+#
+#     agent = create_react_agent(
+#         ChatAnthropic(model="claude-sonnet-4-6"),
+#         tools=[price_from_text],
+#     )
+#
+# The agent sees a standard LangChain tool; self-heal repairs the
+# function until both tests and the verifier pass.

@@ -304,6 +304,22 @@ async def price_from_text(args):
 
 `healing_tool` takes both the Claude Agent SDK's `@tool` parameters and all of `@repair`'s parameters. The result is an `SdkMcpTool` ready to register with `create_sdk_mcp_server(...)`. Requires `pip install 'self-heal-llm[claude]' claude-agent-sdk`.
 
+### LangChain / LangGraph (first-class)
+
+```python
+from self_heal.integrations.langgraph import healing_tool
+
+@healing_tool(
+    "price_from_text",
+    description="Extract a price from messy text.",
+    verify=lambda r: isinstance(r, float) and r > 0,
+)
+def price_from_text(text: str) -> float:
+    return float(text.replace("$", ""))
+```
+
+`healing_tool` mirrors `langchain_core.tools.tool` and stacks `@repair` underneath. The result is a `BaseTool` ready for any LangChain chain or LangGraph agent. Requires `pip install langchain-core langgraph`.
+
 ### Other frameworks (decorator stacking)
 
 Examples in [`examples/`](examples):
