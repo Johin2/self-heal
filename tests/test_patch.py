@@ -116,6 +116,53 @@ def test_is_git_dirty_detects_uncommitted_change(tmp_path):
     assert is_git_dirty(f) is True
 
 
+def test_is_git_dirty_fails_closed_on_timeout(monkeypatch, tmp_path):
+    """A git timeout must return True (fail-closed) so --heal-apply
+    refuses to modify the file. Returning False would let patches land
+    on a file whose actual state is unknown."""
+    from self_heal import _patch
+
+    file_in_repo = tmp_path / "maybe.py"
+    file_in_repo.write_text("x = 1\n", encoding="utf-8")
+
+    def fake_run(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="git", timeout=10)
+
+    monkeypatch.setattr(_patch.subprocess, "run", fake_run)
+    assert _patch.is_git_dirty(file_in_repo) is True
+
+
+def test_is_git_dirty_fails_closed_on_nonzero_exit(monkeypatch, tmp_path):
+    from self_heal import _patch
+
+    file_in_repo = tmp_path / "maybe.py"
+    file_in_repo.write_text("x = 1\n", encoding="utf-8")
+
+    class _Completed:
+        returncode = 128
+        stdout = ""
+        stderr = "fatal: not a git repository (with a weird error)"
+
+    monkeypatch.setattr(_patch.subprocess, "run", lambda *a, **k: _Completed())
+    # Non-zero exit means git couldn't cleanly report; treat as dirty.
+    assert _patch.is_git_dirty(file_in_repo) is True
+
+
+def test_is_git_dirty_returns_false_when_git_absent(monkeypatch, tmp_path):
+    from self_heal import _patch
+
+    file_outside_repo = tmp_path / "foo.py"
+    file_outside_repo.write_text("x = 1\n", encoding="utf-8")
+
+    def fake_run(*_args, **_kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(_patch.subprocess, "run", fake_run)
+    # Git not installed = we're not in a git repo, so --heal-apply can
+    # proceed without a repo-dirty guard.
+    assert _patch.is_git_dirty(file_outside_repo) is False
+
+
 def test_apply_creates_backup_file(tmp_path):
     src = tmp_path / "x.py"
     original_text = "def f():\n    return 1\n"
