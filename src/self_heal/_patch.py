@@ -59,10 +59,15 @@ def apply_function_patch(
 
 
 def is_git_dirty(path: Path) -> bool:
-    """Return True if `path` is git-tracked AND has uncommitted changes.
+    """Return True if `path` is git-tracked AND has uncommitted changes,
+    OR if the git state could not be determined (fail-closed).
 
-    Returns False if the path is not inside a git repo, if git is absent,
-    or if the file is clean.
+    Three real outcomes:
+      - git says clean -> False
+      - git says dirty -> True
+      - git is unavailable (FileNotFoundError) -> False (not in a repo)
+      - git timed out, errored, or returned non-zero -> True (unknown
+        state treated as dirty so callers refuse to overwrite)
     """
     try:
         proc = subprocess.run(
@@ -72,10 +77,18 @@ def is_git_dirty(path: Path) -> bool:
             cwd=path.parent,
             timeout=10,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError:
+        # git binary not installed; treat as "not in a repo" so the
+        # plugin can still apply patches outside git.
         return False
+    except subprocess.TimeoutExpired:
+        # git hung (lock contention, AV scan, etc.). We cannot confirm
+        # clean state, so fail closed: caller sees "dirty" and refuses
+        # to modify the file without --heal-apply-force.
+        return True
     if proc.returncode != 0:
-        return False
+        # Unknown git error; fail closed.
+        return True
     return bool(proc.stdout.strip())
 
 
