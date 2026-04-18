@@ -139,6 +139,24 @@ def my_fn(...): ...
 ```
 Hooks fire on attempt start, failure, propose start/complete, install, cache hit/miss, safety violation, verify, and repair completion. Perfect for agent UIs and observability pipelines.
 
+### Token streaming
+When a callback is registered, self-heal streams LLM tokens through `propose_chunk` events as they arrive:
+
+```python
+from self_heal import RepairEvent, repair
+
+def on_event(event: RepairEvent):
+    if event.type == "propose_chunk":
+        print(event.delta, end="", flush=True)
+
+@repair(on_event=on_event)
+def my_fn(...): ...
+```
+All four built-in proposers stream natively via their SDKs. Custom proposers can implement `propose_stream(system, user) -> Iterator[str]` (and `apropose_stream` for async) to participate; those without streaming fall back to a single completion. See [`examples/streaming_progress.py`](examples/streaming_progress.py).
+
+### Native async proposers
+`arun` prefers each SDK's native async client when the proposer provides `apropose`, falling back to `asyncio.to_thread(propose)` otherwise. All four built-in adapters ship with native async; custom proposers work either way.
+
 ### pytest plugin: `pytest --heal`
 Mark any test with `@pytest.mark.heal(target="mymod.my_fn")`. When it fails with `--heal`, self-heal loads the target, repairs it using the test as verification, and prints the proposed diff at the end of the session.
 
@@ -294,8 +312,9 @@ def parse_price(text: str) -> float:
 - [x] v0.0.2: OpenAI, Gemini, LiteLLM adapters; works with any LLM
 - [x] v0.1.0: multi-turn memory, verifiers, test-driven repair, async, benchmark harness
 - [x] v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks
-- [x] **v0.3.0: subprocess sandbox, `pytest --heal-apply`, QuixBugs benchmark, local-model sweep tooling**
-- [ ] v0.4: wasm sandbox, streaming token events, async proposers for Claude/OpenAI/Gemini
+- [x] v0.3.0: subprocess sandbox, `pytest --heal-apply`, QuixBugs benchmark, local-model sweep tooling
+- [x] **v0.4.0: streaming token events (`propose_chunk`), native async proposers (`apropose`) for all four adapters**
+- [ ] v0.5: wasm sandbox
 - [ ] v1.0: stable API + extended benchmark suite (HumanEval-Fix, Refactory)
 
 ## Contributing
