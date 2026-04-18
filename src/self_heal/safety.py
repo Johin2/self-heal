@@ -80,11 +80,16 @@ _SENSITIVE_MODULE_CALLS: frozenset[str] = frozenset(
 )
 
 
+SandboxMode = Literal["none", "subprocess"]
+
+
 @dataclass
 class SafetyConfig:
     level: SafetyLevel = "moderate"
     extra_allowed_imports: set[str] = field(default_factory=set)
     extra_blocked_imports: set[str] = field(default_factory=set)
+    sandbox: SandboxMode = "none"
+    sandbox_timeout: float = 30.0
 
 
 class UnsafeProposalError(ValueError):
