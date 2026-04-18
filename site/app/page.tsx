@@ -96,11 +96,7 @@ export default function Home() {
             naive="27 / 31 (87%)"
             healed="29 / 31 (94%)"
           />
-          <Stat
-            label="Extra cost for the repair loop"
-            naive="n/a"
-            healed="~17% more LLM calls"
-          />
+          <ProvidersCard />
         </div>
         <p className="mt-6 text-center text-xs text-neutral-500">
           Gemini 2.5 Flash, 3 max attempts, v0.4 harness. Full numbers in{" "}
@@ -213,6 +209,39 @@ function Stat({
       <div className="mt-4 space-y-2 text-sm">
         <Row k="Naive" v={naive} />
         <Row k="self-heal" v={healed} accent />
+      </div>
+    </div>
+  );
+}
+
+function ProvidersCard() {
+  const providers = [
+    "Claude",
+    "OpenAI",
+    "Gemini",
+    "LiteLLM (100+)",
+    "Ollama",
+    "vLLM",
+    "OpenRouter",
+    "Groq",
+  ];
+  return (
+    <div className="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+      <div className="text-xs uppercase tracking-wider text-neutral-500">
+        Providers out of the box
+      </div>
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {providers.map((p) => (
+          <span
+            key={p}
+            className="rounded-md border border-neutral-800 bg-neutral-900/60 px-2 py-0.5 font-mono text-xs text-neutral-300"
+          >
+            {p}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 text-xs text-neutral-500">
+        Or bring your own: implement one <span className="font-mono text-neutral-400">propose()</span> method.
       </div>
     </div>
   );
