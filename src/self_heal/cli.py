@@ -72,6 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     p_bench.add_argument("--model", default=None)
     p_bench.add_argument("--attempts", type=int, default=3)
     p_bench.add_argument("--tasks", default=None)
+    p_bench.add_argument(
+        "--suite", default="default", choices=["default", "quixbugs"]
+    )
 
     args = parser.parse_args(argv)
 
@@ -175,6 +178,8 @@ def _cmd_bench(args) -> int:
         sys.argv += ["--attempts", str(args.attempts)]
     if args.tasks:
         sys.argv += ["--tasks", args.tasks]
+    if getattr(args, "suite", None) and args.suite != "default":
+        sys.argv += ["--suite", args.suite]
 
     sys.path.insert(0, str(Path.cwd()))
     try:

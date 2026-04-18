@@ -192,11 +192,27 @@ def main() -> int:
     parser.add_argument(
         "--tasks", default=None, help="comma-separated task names; default = all"
     )
+    parser.add_argument(
+        "--suite",
+        default="default",
+        choices=["default", "quixbugs"],
+        help="which task suite to run: 'default' (hand-written) or 'quixbugs' "
+        "(QuixBugs repair benchmark, clones on first use)",
+    )
     args = parser.parse_args()
 
     proposer = make_proposer(args.proposer, args.model)
 
-    selected = TASKS
+    if args.suite == "quixbugs":
+        from benchmarks.quixbugs import load_quixbugs_tasks
+
+        try:
+            selected = load_quixbugs_tasks()
+        except RuntimeError as exc:
+            print(f"failed to load QuixBugs: {exc}", file=sys.stderr)
+            return 2
+    else:
+        selected = TASKS
     if args.tasks:
         wanted = {t.strip() for t in args.tasks.split(",")}
         selected = [t for t in TASKS if t.name in wanted]
