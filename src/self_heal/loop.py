@@ -329,9 +329,23 @@ class _RunContext:
                         RepairEvent("safety_violation", error=str(safety_err)),
                     )
                     return
-            repaired = RepairLoop._recompile(
-                proposed, self.original.__name__, self.original
-            )
+            if (
+                self.loop.safety is not None
+                and self.loop.safety.sandbox == "subprocess"
+            ):
+                from self_heal.sandbox import (
+                    SubprocessSandbox,
+                    make_sandboxed_callable,
+                )
+
+                sb = SubprocessSandbox(timeout=self.loop.safety.sandbox_timeout)
+                repaired = make_sandboxed_callable(
+                    proposed, self.original.__name__, sb
+                )
+            else:
+                repaired = RepairLoop._recompile(
+                    proposed, self.original.__name__, self.original
+                )
         except Exception as repair_exc:
             self.loop._log(f"Repair step itself failed: {repair_exc}")
             self.attempts[-1].error_after_repair = str(repair_exc)
