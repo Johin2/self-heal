@@ -355,6 +355,12 @@ def parse_price(text: str) -> float:
 - [ ] v0.5: wasm sandbox
 - [ ] v1.0: stable API + extended benchmark suite (HumanEval-Fix, Refactory)
 
+## Deeper docs
+
+- [`docs/sandbox-threat-model.md`](docs/sandbox-threat-model.md): what the subprocess sandbox protects against and what it does not. Read before running against untrusted inputs.
+- [`docs/custom-proposer.md`](docs/custom-proposer.md): implementing the `LLMProposer` Protocol for an unsupported provider.
+- [`docs/faq.md`](docs/faq.md): positioning, cost, safety, integrations, contribution.
+
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide: dev setup, everyday commands, how to add a new LLM proposer or benchmark task, and the PR checklist. Good first issues are tagged [here](https://github.com/Johin2/self-heal/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
