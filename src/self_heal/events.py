@@ -22,6 +22,7 @@ EventType = Literal[
     "attempt_start",
     "attempt_failed",
     "propose_start",
+    "propose_chunk",
     "propose_complete",
     "install_success",
     "install_failed",
@@ -43,6 +44,7 @@ class RepairEvent:
     failure: Failure | None = None
     proposed_source: str | None = None
     error: str | None = None
+    delta: str | None = None
     extra: dict[str, Any] | None = None
 
 
