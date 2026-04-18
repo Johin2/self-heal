@@ -149,7 +149,7 @@ class RepairLoop:
                 emit(self.on_event, RepairEvent("repair_exhausted", attempt_number=attempt_num))
                 return ctx.final_failure()
 
-            raw = await asyncio.to_thread(self._obtain_repair, ctx)
+            raw = await self._aobtain_repair(ctx)
             ctx.apply_proposal(raw, attempt_num)
 
         emit(self.on_event, RepairEvent("repair_exhausted"))
@@ -177,12 +177,70 @@ class RepairLoop:
             history=list(ctx.attempts),
             extra=ctx.prompt_extra,
         )
-        raw = self.proposer.propose(system, user)
+
+        proposer = self.proposer
+        if hasattr(proposer, "propose_stream") and self.on_event is not None:
+            chunks: list[str] = []
+            try:
+                for delta in proposer.propose_stream(system, user):
+                    chunks.append(delta)
+                    emit(self.on_event, RepairEvent("propose_chunk", delta=delta))
+                raw = "".join(chunks)
+            except Exception:
+                raw = proposer.propose(system, user)
+        else:
+            raw = proposer.propose(system, user)
+
         emit(
             self.on_event,
             RepairEvent("propose_complete", proposed_source=extract_code(raw)),
         )
         return raw
+
+    async def _aobtain_repair(self, ctx: _RunContext) -> str:
+        """Async variant of _obtain_repair. Prefers native apropose/
+        apropose_stream when the proposer provides them."""
+        if self.cache is not None:
+            hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
+            if hit is not None:
+                self._log("Cache hit — skipping LLM.")
+                emit(self.on_event, RepairEvent("cache_hit"))
+                return hit
+            emit(self.on_event, RepairEvent("cache_miss"))
+
+        self._log("Proposing repair...")
+        emit(self.on_event, RepairEvent("propose_start"))
+        system, user = build_messages(
+            ctx.original_source,
+            ctx.last_failure,
+            history=list(ctx.attempts),
+            extra=ctx.prompt_extra,
+        )
+
+        proposer = self.proposer
+        if hasattr(proposer, "apropose_stream") and self.on_event is not None:
+            chunks: list[str] = []
+            try:
+                async for delta in proposer.apropose_stream(system, user):
+                    chunks.append(delta)
+                    emit(self.on_event, RepairEvent("propose_chunk", delta=delta))
+                raw = "".join(chunks)
+            except Exception:
+                raw = await self._acall_propose(proposer, system, user)
+        else:
+            raw = await self._acall_propose(proposer, system, user)
+
+        emit(
+            self.on_event,
+            RepairEvent("propose_complete", proposed_source=extract_code(raw)),
+        )
+        return raw
+
+    @staticmethod
+    async def _acall_propose(proposer, system: str, user: str) -> str:
+        if hasattr(proposer, "apropose"):
+            return await proposer.apropose(system, user)
+        return await asyncio.to_thread(proposer.propose, system, user)
 
     def _log(self, message: str) -> None:
         if self.verbose:

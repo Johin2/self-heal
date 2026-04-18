@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 try:
-    from openai import OpenAI
+    from openai import AsyncOpenAI, OpenAI
 except ImportError as _err:  # pragma: no cover
     raise ImportError(
         "OpenAIProposer requires the `openai` package. "
@@ -56,12 +56,21 @@ class OpenAIProposer:
     ):
         self.model = model
         self.max_tokens = max_tokens
-        self.client = OpenAI(
-            api_key=api_key or os.environ.get("OPENAI_API_KEY"),
-            base_url=base_url,
-        )
+        resolved_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self._api_key = resolved_key
+        self._base_url = base_url
+        self.client = OpenAI(api_key=resolved_key, base_url=base_url)
+        self._aclient: AsyncOpenAI | None = None
 
-    def propose(self, system: str, user: str) -> str:
+    @property
+    def aclient(self) -> AsyncOpenAI:
+        if self._aclient is None:
+            self._aclient = AsyncOpenAI(
+                api_key=self._api_key, base_url=self._base_url
+            )
+        return self._aclient
+
+    def _params(self, system: str, user: str) -> dict:
         params: dict = {
             "model": self.model,
             "messages": [
@@ -71,7 +80,36 @@ class OpenAIProposer:
         }
         if self.max_tokens is not None:
             params["max_completion_tokens"] = self.max_tokens
+        return params
 
-        completion = self.client.chat.completions.create(**params)
-        choice = completion.choices[0]
-        return choice.message.content or ""
+    def propose(self, system: str, user: str) -> str:
+        completion = self.client.chat.completions.create(**self._params(system, user))
+        return completion.choices[0].message.content or ""
+
+    async def apropose(self, system: str, user: str) -> str:
+        completion = await self.aclient.chat.completions.create(
+            **self._params(system, user)
+        )
+        return completion.choices[0].message.content or ""
+
+    def propose_stream(self, system: str, user: str):
+        stream = self.client.chat.completions.create(
+            stream=True, **self._params(system, user)
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
+    async def apropose_stream(self, system: str, user: str):
+        stream = await self.aclient.chat.completions.create(
+            stream=True, **self._params(system, user)
+        )
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
