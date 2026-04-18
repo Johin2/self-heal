@@ -77,3 +77,10 @@ uv.lock
 .mypy_cache/
 .pyright/
 .pytype/
+
+# Dev-session artifacts (never commit)
+.claude/
+.playwright-mcp/
+site-preview-fullpage.png
+site-preview-*.png
+.private/
