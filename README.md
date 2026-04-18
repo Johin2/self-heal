@@ -35,7 +35,7 @@ On 19 small Python tasks with plausible bugs (price parsing, palindrome, flatten
 | Naive single-shot repair | 13 / 19 | 68% | 17 |
 | **self-heal (multi-turn + memory)** | **19 / 19** | **100%** | 21 |
 
-*Gemini 2.5 Flash, max 3 attempts, v0.2 harness. Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash`. Full task list in [`benchmarks/tasks.py`](benchmarks/tasks.py).*
+*Gemini 2.5 Flash, max 3 attempts, v0.2 harness. Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash`. Full task list in [`benchmarks/tasks.py`](benchmarks/tasks.py). For the QuixBugs repair benchmark (40 programs, industry-standard): `self-heal bench --suite quixbugs`. Community-submitted results live in [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md).*
 
 The 6 tasks where self-heal wins (`extract_price`, `is_palindrome`, `count_vowels`, `levenshtein`, `format_duration`, `is_anagram`) all share a pattern: the first proposed fix handles one edge case but misses another. Memory of the failed attempt plus test feedback lets the second proposal cover both. The remaining 4 extra LLM calls (21 vs 17) are the price for +6 tasks repaired: **~30% more calls for +46% more wins.**
 
@@ -111,12 +111,21 @@ def my_fn(...): ...
 ```
 First repair hits the LLM. Subsequent identical failures are served from SQLite (zero latency, zero cost). Keyed on source hash + failure signature with whitespace and memory-address normalization.
 
-### AST safety rails: block dangerous proposals
+### Safety: AST rails + subprocess sandbox
+Two independent layers. Combine them freely.
+
 ```python
-@repair(safety="moderate")   # default off; "moderate" | "strict" | SafetyConfig(...)
+from self_heal import repair, SafetyConfig
+
+# AST rails only (zero overhead)
+@repair(safety="moderate")   # "moderate" | "strict" | SafetyConfig(...)
+def my_fn(...): ...
+
+# AST rails + process isolation (each call runs in `python -I`)
+@repair(safety=SafetyConfig(level="moderate", sandbox="subprocess"))
 def my_fn(...): ...
 ```
-`moderate` rejects proposals that call `eval` / `exec` / `os.system`, import `subprocess` / `socket` / `pickle` / `ctypes`, or touch `__globals__` / `__class__` / other escape hatches. `strict` additionally forbids any non-whitelisted import.
+`moderate` rejects proposals that call `eval` / `exec` / `os.system`, import `subprocess` / `socket` / `pickle` / `ctypes`, or touch `__globals__` / `__class__` / other escape hatches. `strict` additionally forbids any non-whitelisted import. The subprocess sandbox adds a real process boundary: args and return values are pickled over stdin/stdout, and the child inherits none of the caller's globals (proposals must be self-contained). See [Safety](#safety) for the full trust model.
 
 ### Progress callbacks
 ```python
@@ -142,8 +151,11 @@ def test_rupees():
     assert extract_price("₹1,299") == 1299.0
 ```
 ```bash
-pytest --heal
+pytest --heal              # print proposed fix, leave files untouched
+pytest --heal-apply        # write the fix back to disk (creates a .py.heal-backup)
+pytest --heal-apply-force  # also allow modification of git-dirty files
 ```
+`--heal-apply` uses libcst for AST-faithful replacement when installed, falling back to textual replacement. It refuses to modify files with uncommitted git changes unless `--heal-apply-force` is given.
 
 ### CLI: heal a function from the command line
 ```bash
@@ -262,18 +274,29 @@ LiteLLMProposer(model="cohere/command-r-plus")
 
 ## Safety
 
-`self-heal` executes LLM-generated code via `exec()` in the same process. Same trust boundary as any LLM-in-the-loop system: do not run against untrusted inputs without a sandbox. Sandboxed execution is on the roadmap.
+`self-heal` executes LLM-generated code via `exec()` in the same process by default. Three layers of defense are available:
+
+1. **AST rails** (`SafetyConfig(level="moderate"|"strict")`) block dangerous imports, `eval`/`exec`, introspection escape hatches, and `os.system`-style calls before any code runs.
+2. **Subprocess sandbox** (`SafetyConfig(sandbox="subprocess")`) runs each call to the repaired function in a fresh `python -I` child process. Args/return value go over stdin/stdout via pickle. The child inherits none of the caller's globals, so proposals must be self-contained.
+3. Same trust boundary as any LLM-in-the-loop system: still do not run against untrusted inputs without network isolation.
+
+```python
+from self_heal import repair, SafetyConfig
+
+@repair(safety=SafetyConfig(level="moderate", sandbox="subprocess"))
+def parse_price(text: str) -> float:
+    ...
+```
 
 ## Roadmap
 
 - [x] v0.0.1: core repair loop + decorator + Claude backend
 - [x] v0.0.2: OpenAI, Gemini, LiteLLM adapters; works with any LLM
 - [x] v0.1.0: multi-turn memory, verifiers, test-driven repair, async, benchmark harness
-- [x] **v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks**
-- [ ] v0.3: streaming token events + async proposers for Claude/OpenAI/Gemini
-- [ ] v0.4: sandboxed execution (subprocess/wasm)
-- [ ] v0.5: `pytest --heal --apply` for in-place file patching
-- [ ] v1.0: stable API + extended benchmark suite (QuixBugs, HumanEval-Fix)
+- [x] v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks
+- [x] **v0.3.0: subprocess sandbox, `pytest --heal-apply`, QuixBugs benchmark, local-model sweep tooling**
+- [ ] v0.4: wasm sandbox, streaming token events, async proposers for Claude/OpenAI/Gemini
+- [ ] v1.0: stable API + extended benchmark suite (HumanEval-Fix, Refactory)
 
 ## Contributing
 
@@ -293,9 +316,10 @@ ruff check .
 
 Run the benchmark locally:
 ```bash
-python benchmarks/run.py --proposer claude       # uses ANTHROPIC_API_KEY
-python benchmarks/run.py --proposer openai       # uses OPENAI_API_KEY
-python benchmarks/run.py --proposer gemini       # uses GEMINI_API_KEY
+python benchmarks/run.py --proposer claude                       # uses ANTHROPIC_API_KEY
+python benchmarks/run.py --proposer openai                       # uses OPENAI_API_KEY
+python benchmarks/run.py --proposer gemini                       # uses GEMINI_API_KEY
+python benchmarks/run.py --suite quixbugs --proposer gemini      # QuixBugs (40 programs, clones on first use)
 ```
 
 ## License
