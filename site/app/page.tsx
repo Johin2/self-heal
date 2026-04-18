@@ -47,7 +47,7 @@ export default function Home() {
       <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pt-16 pb-24 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-950/50 px-3 py-1 text-xs text-neutral-400">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Now with subprocess sandbox and streaming events
+          Ship agents to production with a repair loop, audit trail, and sandbox
         </div>
         <h1 className="mx-auto mt-6 max-w-3xl text-balance text-5xl font-semibold tracking-tight sm:text-6xl">
           The reliability layer for AI agents
