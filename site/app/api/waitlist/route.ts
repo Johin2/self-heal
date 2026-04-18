@@ -41,15 +41,17 @@ export async function POST(request: Request) {
     ua: request.headers.get("user-agent") ?? null,
   });
 
+  // Always emit a greppable structured log line. On Vercel this is
+  // visible under Logs in the project dashboard and is the only
+  // durable capture path until we swap to a real backend.
+  console.log(`WAITLIST_SIGNUP ${record}`);
+
   try {
     await fs.mkdir(path.dirname(WAITLIST_FILE), { recursive: true });
     await fs.appendFile(WAITLIST_FILE, record + "\n", "utf-8");
-  } catch (err) {
-    // Production deployments on serverless platforms (Vercel) have a
-    // read-only filesystem, so this will fail. The ok-path below still
-    // returns 200 so the UI feels correct; logs capture the email.
-    console.error("[waitlist] filesystem write failed", err);
-    console.log("[waitlist]", record);
+  } catch {
+    // Serverless platforms have a read-only filesystem; the structured
+    // log above is the durable record in that case.
   }
 
   return NextResponse.json({ ok: true });
