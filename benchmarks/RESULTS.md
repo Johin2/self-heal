@@ -7,13 +7,18 @@ Submit a PR appending your own row.
 
 | Proposer | Model | Attempts | Naive pass | self-heal pass | Delta | Hardware | Submitter |
 |----------|-------|----------|------------|----------------|-------|----------|-----------|
-| gemini   | gemini-2.5-flash | 3 | 68% (13/19) | 100% (19/19) | +6 | API | @Johin2 |
+| gemini   | gemini-2.5-flash | 3 | 68% (13/19) | 100% (19/19) | +6 | API (v0.2 harness) | @Johin2 |
+| gemini   | gemini-2.5-flash | 3 | 84% (16/19) | 95% (18/19) | +2 | API (v0.4 harness) | @Johin2 |
 
-## QuixBugs suite (40 programs, `--suite quixbugs`)
+Runs are non-deterministic: the proposer model changes, the LLM outputs change. The v0.4 row shows naive pass rate improved (Gemini Flash got better between runs) while self-heal still edges it out; `extract_price` was the one self-heal task this run didn't repair within 3 attempts.
+
+## QuixBugs suite (31 programs, `--suite quixbugs`)
 
 | Proposer | Model | Attempts | Naive pass | self-heal pass | Delta | Hardware | Submitter |
 |----------|-------|----------|------------|----------------|-------|----------|-----------|
-| _TBD_    |       |          |            |                |       |          |           |
+| gemini   | gemini-2.5-flash | 3 | 87% (27/31) | 94% (29/31) | +2 | API | @Johin2 |
+
+Tasks where self-heal won over naive: `hanoi`, `levenshtein`. Tasks unrepaired in 3 attempts: `next_palindrome`, `sqrt`. Nine QuixBugs programs with graph/tree object testcases are skipped by the loader (see `benchmarks/quixbugs/loader.py::_SKIP`), leaving 31.
 
 ## How to contribute a row
 
