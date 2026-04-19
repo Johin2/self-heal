@@ -32,6 +32,13 @@ _INSTALL_HINT = (
 
 
 class RepairLoop:
+    """Iteratively repair a failing callable using an LLM.
+
+    Each call to run() or arun() attempts to fix the function up to
+    max_attempts times, using an LLM to propose new source code after
+    each failure.
+    """
+
     def __init__(
         self,
         model: str = "claude-sonnet-4-6",
@@ -135,6 +142,15 @@ class RepairLoop:
         return ctx.final_failure()
 
     def _obtain_repair(self, ctx: _RunContext) -> str:
+        """Ask the LLM for a repaired version of the failing function (sync).
+
+        Checks the cache first. If the proposer supports streaming and an
+        on_event callback is registered, emits propose_chunk events for each
+        delta. If streaming fails, emits a stream_error event and falls back
+        to the regular propose() call.
+
+        Returns the raw LLM response string.
+        """
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
@@ -173,6 +189,14 @@ class RepairLoop:
         return raw
 
     async def _aobtain_repair(self, ctx: _RunContext) -> str:
+        """Async version of _obtain_repair.
+
+        Prefers apropose_stream if available, then apropose, then falls back
+        to running the sync propose() in a thread via asyncio.to_thread.
+        Emits stream_error if async streaming raises an exception.
+
+        Returns the raw LLM response string.
+        """
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
@@ -240,6 +264,13 @@ class RepairLoop:
 
 
 class _RunContext:
+    """Holds all mutable state for a single run() or arun() call.
+
+    Keeps track of the original function, the current (possibly repaired)
+    version, the list of attempts so far, and the last recorded failure.
+    Shared between the sync and async code paths.
+    """
+
     def __init__(
         self,
         loop: RepairLoop,
