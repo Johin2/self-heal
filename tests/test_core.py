@@ -153,3 +153,39 @@ def test_decorator_returns_none_on_failure_when_configured():
 def test_rejects_invalid_max_attempts():
     with pytest.raises(ValueError):
         RepairLoop(max_attempts=0)
+
+
+def test_build_messages_sandbox_hint_absent_by_default() -> None:
+    """Without sandbox=True, the system prompt is the base REPAIR_SYSTEM."""
+    from self_heal.propose import REPAIR_SYSTEM, build_messages
+    from self_heal.types import Failure
+
+    failure = Failure(
+        kind="exception",
+        error_type="ValueError",
+        message="bad input",
+        inputs={},
+        traceback=None,
+    )
+    system, _ = build_messages("def f(): pass", failure)
+    assert system == REPAIR_SYSTEM
+    assert "subprocess sandbox" not in system
+
+
+def test_build_messages_sandbox_hint_added_when_flag_set() -> None:
+    """sandbox=True appends the SANDBOX_IMPORT_HINT explaining that the
+    proposed function must import every module it uses."""
+    from self_heal.propose import REPAIR_SYSTEM, SANDBOX_IMPORT_HINT, build_messages
+    from self_heal.types import Failure
+
+    failure = Failure(
+        kind="exception",
+        error_type="NameError",
+        message="name 'math' is not defined",
+        inputs={},
+        traceback=None,
+    )
+    system, _ = build_messages("def f(x): return math.sqrt(x)", failure, sandbox=True)
+    assert system == REPAIR_SYSTEM + SANDBOX_IMPORT_HINT
+    assert "subprocess sandbox" in system
+    assert "import every module" in system

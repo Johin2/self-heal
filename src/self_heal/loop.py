@@ -176,6 +176,7 @@ class RepairLoop:
             ctx.last_failure,
             history=list(ctx.attempts),
             extra=ctx.prompt_extra,
+            sandbox=(self.safety is not None and self.safety.sandbox == "subprocess"),
         )
 
         proposer = self.proposer
@@ -215,6 +216,7 @@ class RepairLoop:
             ctx.last_failure,
             history=list(ctx.attempts),
             extra=ctx.prompt_extra,
+            sandbox=(self.safety is not None and self.safety.sandbox == "subprocess"),
         )
 
         proposer = self.proposer

@@ -136,6 +136,8 @@ def my_fn(...): ...
 ```
 `moderate` rejects proposals that call `eval` / `exec` / `os.system`, import `subprocess` / `socket` / `pickle` / `ctypes`, or touch `__globals__` / `__class__` / other escape hatches. `strict` additionally forbids any non-whitelisted import. The subprocess sandbox adds a real process boundary: args and return values are pickled over stdin/stdout, and the child inherits none of the caller's globals (proposals must be self-contained). See [Safety](#safety) for the full trust model.
 
+> **Sandbox + imports.** When `sandbox="subprocess"` is active, the child runs with `python -I` in a fresh namespace. **The repaired function must import every module it uses at the top of the definition.** `import math` at the caller module scope does NOT reach the sandbox, so a proposal that references `math.sqrt` without a local `import math` raises `NameError` on the first call. `self-heal` already hints at this in the LLM prompt when sandbox is active, but if you're writing a proposer by hand the same rule applies.
+
 ### Progress callbacks
 ```python
 from self_heal import repair, RepairEvent
