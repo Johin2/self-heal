@@ -32,20 +32,6 @@ _INSTALL_HINT = (
 
 
 class RepairLoop:
-    """Iteratively repair a failing callable using an LLM.
-
-    Example:
-        loop = RepairLoop(max_attempts=3)
-        result = loop.run(my_function, args=(1, 2))
-        if result.succeeded:
-            print(result.final_value)
-
-    Optional features (all off by default):
-        - `cache`:    persistent SQLite cache of (source, failure) → repair
-        - `safety`:   AST-based safety checks on every LLM proposal
-        - `on_event`: callback hook for observing repair progress
-    """
-
     def __init__(
         self,
         model: str = "claude-sonnet-4-6",
@@ -68,7 +54,6 @@ class RepairLoop:
 
     @property
     def proposer(self) -> LLMProposer:
-        """Return the configured proposer, creating the default lazily."""
         if self._proposer is None:
             try:
                 from self_heal.llm import ClaudeProposer
@@ -76,10 +61,6 @@ class RepairLoop:
                 raise ImportError(_INSTALL_HINT) from err
             self._proposer = ClaudeProposer(model=self._model)
         return self._proposer
-
-    # ------------------------------------------------------------------
-    # Public runners
-    # ------------------------------------------------------------------
 
     def run(
         self,
@@ -90,7 +71,6 @@ class RepairLoop:
         tests: list[Test] | None = None,
         prompt_extra: str | None = None,
     ) -> RepairResult:
-        """Sync: call `func(*args, **kwargs)`, repairing until it succeeds."""
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -127,7 +107,6 @@ class RepairLoop:
         tests: list[Test] | None = None,
         prompt_extra: str | None = None,
     ) -> RepairResult:
-        """Async variant of `run`."""
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -155,12 +134,7 @@ class RepairLoop:
         emit(self.on_event, RepairEvent("repair_exhausted"))
         return ctx.final_failure()
 
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
-
     def _obtain_repair(self, ctx: _RunContext) -> str:
-        """Check cache first, otherwise ask the LLM."""
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
@@ -186,7 +160,8 @@ class RepairLoop:
                     chunks.append(delta)
                     emit(self.on_event, RepairEvent("propose_chunk", delta=delta))
                 raw = "".join(chunks)
-            except Exception:
+            except Exception as stream_exc:
+                emit(self.on_event, RepairEvent("stream_error", error=str(stream_exc)))
                 raw = proposer.propose(system, user)
         else:
             raw = proposer.propose(system, user)
@@ -198,8 +173,6 @@ class RepairLoop:
         return raw
 
     async def _aobtain_repair(self, ctx: _RunContext) -> str:
-        """Async variant of _obtain_repair. Prefers native apropose/
-        apropose_stream when the proposer provides them."""
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
@@ -225,7 +198,8 @@ class RepairLoop:
                     chunks.append(delta)
                     emit(self.on_event, RepairEvent("propose_chunk", delta=delta))
                 raw = "".join(chunks)
-            except Exception:
+            except Exception as stream_exc:
+                emit(self.on_event, RepairEvent("stream_error", error=str(stream_exc)))
                 raw = await self._acall_propose(proposer, system, user)
         else:
             raw = await self._acall_propose(proposer, system, user)
@@ -266,8 +240,6 @@ class RepairLoop:
 
 
 class _RunContext:
-    """Per-run state for RepairLoop (sync and async share this)."""
-
     def __init__(
         self,
         loop: RepairLoop,
@@ -375,7 +347,6 @@ class _RunContext:
     def apply_proposal(self, raw: str, attempt_num: int) -> None:
         try:
             proposed = extract_code(raw)
-            # Safety check before exec.
             if self.loop.safety is not None:
                 try:
                     validate(proposed, self.loop.safety)
@@ -411,7 +382,6 @@ class _RunContext:
                 self.loop.on_event,
                 RepairEvent("install_failed", error=str(repair_exc)),
             )
-            # Record the failed cache entry so we don't serve it again.
             if self.loop.cache is not None:
                 self.loop.cache.record(
                     self.original_source,
