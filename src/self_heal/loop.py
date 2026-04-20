@@ -37,6 +37,27 @@ class RepairLoop:
     Each call to run() or arun() attempts to fix the function up to
     max_attempts times, using an LLM to propose new source code after
     each failure.
+
+    Example::
+
+        from self_heal import RepairLoop
+
+        def flaky(x):
+            return x / 0          # ZeroDivisionError on first call
+
+        loop = RepairLoop(max_attempts=3)
+        result = loop.run(flaky, args=(4,), verify=lambda v: v == 2)
+        print(result.succeeded)   # True (after LLM patches the function)
+
+    Optional features:
+
+    * **cache** - pass a :class:`RepairCache` to skip the LLM when the same
+      error has been seen and fixed before.
+    * **safety** - pass a :class:`SafetyConfig` to validate proposed code
+      before it is executed, optionally running it in a subprocess sandbox.
+    * **on_event** - pass an :class:`EventCallback` to receive structured
+      :class:`RepairEvent` objects as the loop progresses (useful for
+      logging, progress UIs, and streaming token display).
     """
 
     def __init__(
@@ -61,6 +82,7 @@ class RepairLoop:
 
     @property
     def proposer(self) -> LLMProposer:
+        """Return the configured proposer, creating the default lazily."""
         if self._proposer is None:
             try:
                 from self_heal.llm import ClaudeProposer
@@ -68,6 +90,8 @@ class RepairLoop:
                 raise ImportError(_INSTALL_HINT) from err
             self._proposer = ClaudeProposer(model=self._model)
         return self._proposer
+
+    # ----- Public runners -----
 
     def run(
         self,
@@ -78,6 +102,7 @@ class RepairLoop:
         tests: list[Test] | None = None,
         prompt_extra: str | None = None,
     ) -> RepairResult:
+        """Sync: call `func(*args, **kwargs)`, repairing until it succeeds."""
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -114,6 +139,7 @@ class RepairLoop:
         tests: list[Test] | None = None,
         prompt_extra: str | None = None,
     ) -> RepairResult:
+        """Async variant of `run`."""
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -141,6 +167,8 @@ class RepairLoop:
         emit(self.on_event, RepairEvent("repair_exhausted"))
         return ctx.final_failure()
 
+    # ----- Internals -----
+
     def _obtain_repair(self, ctx: _RunContext) -> str:
         """Ask the LLM for a repaired version of the failing function (sync).
 
@@ -154,7 +182,7 @@ class RepairLoop:
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
-                self._log("Cache hit — skipping LLM.")
+                self._log("Cache hit - skipping LLM.")
                 emit(self.on_event, RepairEvent("cache_hit"))
                 return hit
             emit(self.on_event, RepairEvent("cache_miss"))
@@ -200,7 +228,7 @@ class RepairLoop:
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
-                self._log("Cache hit — skipping LLM.")
+                self._log("Cache hit - skipping LLM.")
                 emit(self.on_event, RepairEvent("cache_hit"))
                 return hit
             emit(self.on_event, RepairEvent("cache_miss"))
@@ -378,6 +406,7 @@ class _RunContext:
     def apply_proposal(self, raw: str, attempt_num: int) -> None:
         try:
             proposed = extract_code(raw)
+            # Safety check before exec.
             if self.loop.safety is not None:
                 try:
                     validate(proposed, self.loop.safety)
@@ -413,6 +442,7 @@ class _RunContext:
                 self.loop.on_event,
                 RepairEvent("install_failed", error=str(repair_exc)),
             )
+            # Record the failed cache entry so we don't serve it again.
             if self.loop.cache is not None:
                 self.loop.cache.record(
                     self.original_source,

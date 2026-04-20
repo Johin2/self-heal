@@ -191,6 +191,91 @@ def test_repair_event_has_delta_field():
 
 
 # ---------------------------------------------------------------------------
+# stream_error regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_run_emits_stream_error_with_error_payload():
+    """sync path: propose_stream raising must emit stream_error with the
+    exception message as the error field, then fall back to propose()."""
+    source = "def f(x):\n    return x * 2\n"
+    error_message = "network timeout"
+
+    class BrokenStream:
+        def __init__(self):
+            self.propose_calls = 0
+
+        def propose(self, s, u):
+            self.propose_calls += 1
+            return source
+
+        def propose_stream(self, s, u):
+            raise RuntimeError(error_message)
+            yield  # pragma: no cover
+
+    p = BrokenStream()
+    events: list[RepairEvent] = []
+    loop = RepairLoop(
+        max_attempts=2, proposer=p, on_event=lambda e: events.append(e)
+    )
+
+    def f(x):
+        return None
+
+    result = loop.run(f, args=(5,), verify=lambda v: v == 10)
+
+    # repair must still succeed via the fallback propose() path
+    assert result.succeeded
+    assert p.propose_calls == 1
+
+    # exactly one stream_error event must have been emitted
+    stream_errors = [e for e in events if e.type == "stream_error"]
+    assert len(stream_errors) == 1
+    assert stream_errors[0].error == error_message
+
+
+def test_arun_emits_stream_error_with_error_payload():
+    """async path: apropose_stream raising must emit stream_error with the
+    exception message as the error field, then fall back to propose()."""
+    source = "def f(x):\n    return x * 2\n"
+    error_message = "async stream broken"
+
+    class BrokenAsyncStream:
+        def __init__(self):
+            self.propose_calls = 0
+
+        def propose(self, s, u):
+            self.propose_calls += 1
+            return source
+
+        async def apropose_stream(self, s, u):
+            raise RuntimeError(error_message)
+            # async generator marker so Python treats this as an async generator
+            # even though the raise is unconditional
+            yield  # pragma: no cover
+
+    p = BrokenAsyncStream()
+    events: list[RepairEvent] = []
+    loop = RepairLoop(
+        max_attempts=2, proposer=p, on_event=lambda e: events.append(e)
+    )
+
+    def f(x):
+        return None
+
+    result = asyncio.run(loop.arun(f, args=(5,), verify=lambda v: v == 10))
+
+    # repair must still succeed via the fallback propose() path
+    assert result.succeeded
+    assert p.propose_calls == 1
+
+    # exactly one stream_error event must have been emitted
+    stream_errors = [e for e in events if e.type == "stream_error"]
+    assert len(stream_errors) == 1
+    assert stream_errors[0].error == error_message
+
+
+# ---------------------------------------------------------------------------
 # Verify imports still work
 # ---------------------------------------------------------------------------
 
