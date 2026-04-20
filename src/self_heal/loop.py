@@ -34,16 +34,30 @@ _INSTALL_HINT = (
 class RepairLoop:
     """Iteratively repair a failing callable using an LLM.
 
-    Example:
-        loop = RepairLoop(max_attempts=3)
-        result = loop.run(my_function, args=(1, 2))
-        if result.succeeded:
-            print(result.final_value)
+    Each call to run() or arun() attempts to fix the function up to
+    max_attempts times, using an LLM to propose new source code after
+    each failure.
 
-    Optional features (all off by default):
-        - `cache`:    persistent SQLite cache of (source, failure) → repair
-        - `safety`:   AST-based safety checks on every LLM proposal
-        - `on_event`: callback hook for observing repair progress
+    Example::
+
+        from self_heal import RepairLoop
+
+        def flaky(x):
+            return x / 0          # ZeroDivisionError on first call
+
+        loop = RepairLoop(max_attempts=3)
+        result = loop.run(flaky, args=(4,), verify=lambda v: v == 2)
+        print(result.succeeded)   # True (after LLM patches the function)
+
+    Optional features:
+
+    * **cache** - pass a :class:`RepairCache` to skip the LLM when the same
+      error has been seen and fixed before.
+    * **safety** - pass a :class:`SafetyConfig` to validate proposed code
+      before it is executed, optionally running it in a subprocess sandbox.
+    * **on_event** - pass an :class:`EventCallback` to receive structured
+      :class:`RepairEvent` objects as the loop progresses (useful for
+      logging, progress UIs, and streaming token display).
     """
 
     def __init__(
@@ -77,9 +91,7 @@ class RepairLoop:
             self._proposer = ClaudeProposer(model=self._model)
         return self._proposer
 
-    # ------------------------------------------------------------------
-    # Public runners
-    # ------------------------------------------------------------------
+    # ----- Public runners -----
 
     def run(
         self,
@@ -155,16 +167,22 @@ class RepairLoop:
         emit(self.on_event, RepairEvent("repair_exhausted"))
         return ctx.final_failure()
 
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
+    # ----- Internals -----
 
     def _obtain_repair(self, ctx: _RunContext) -> str:
-        """Check cache first, otherwise ask the LLM."""
+        """Ask the LLM for a repaired version of the failing function (sync).
+
+        Checks the cache first. If the proposer supports streaming and an
+        on_event callback is registered, emits propose_chunk events for each
+        delta. If streaming fails, emits a stream_error event and falls back
+        to the regular propose() call.
+
+        Returns the raw LLM response string.
+        """
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
-                self._log("Cache hit — skipping LLM.")
+                self._log("Cache hit - skipping LLM.")
                 emit(self.on_event, RepairEvent("cache_hit"))
                 return hit
             emit(self.on_event, RepairEvent("cache_miss"))
@@ -187,7 +205,8 @@ class RepairLoop:
                     chunks.append(delta)
                     emit(self.on_event, RepairEvent("propose_chunk", delta=delta))
                 raw = "".join(chunks)
-            except Exception:
+            except Exception as stream_exc:
+                emit(self.on_event, RepairEvent("stream_error", error=str(stream_exc)))
                 raw = proposer.propose(system, user)
         else:
             raw = proposer.propose(system, user)
@@ -199,12 +218,18 @@ class RepairLoop:
         return raw
 
     async def _aobtain_repair(self, ctx: _RunContext) -> str:
-        """Async variant of _obtain_repair. Prefers native apropose/
-        apropose_stream when the proposer provides them."""
+        """Async version of _obtain_repair.
+
+        Prefers apropose_stream if available, then apropose, then falls back
+        to running the sync propose() in a thread via asyncio.to_thread.
+        Emits stream_error if async streaming raises an exception.
+
+        Returns the raw LLM response string.
+        """
         if self.cache is not None:
             hit = self.cache.lookup(ctx.original_source, ctx.last_failure)
             if hit is not None:
-                self._log("Cache hit — skipping LLM.")
+                self._log("Cache hit - skipping LLM.")
                 emit(self.on_event, RepairEvent("cache_hit"))
                 return hit
             emit(self.on_event, RepairEvent("cache_miss"))
@@ -227,7 +252,8 @@ class RepairLoop:
                     chunks.append(delta)
                     emit(self.on_event, RepairEvent("propose_chunk", delta=delta))
                 raw = "".join(chunks)
-            except Exception:
+            except Exception as stream_exc:
+                emit(self.on_event, RepairEvent("stream_error", error=str(stream_exc)))
                 raw = await self._acall_propose(proposer, system, user)
         else:
             raw = await self._acall_propose(proposer, system, user)
@@ -268,7 +294,12 @@ class RepairLoop:
 
 
 class _RunContext:
-    """Per-run state for RepairLoop (sync and async share this)."""
+    """Holds all mutable state for a single run() or arun() call.
+
+    Keeps track of the original function, the current (possibly repaired)
+    version, the list of attempts so far, and the last recorded failure.
+    Shared between the sync and async code paths.
+    """
 
     def __init__(
         self,
