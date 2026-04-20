@@ -47,16 +47,31 @@ PREVIOUS REPAIR ATTEMPTS — ALL FAILED. Do NOT propose any of these again:
 _CODE_BLOCK = re.compile(r"```(?:python)?\n?(.*?)```", re.DOTALL)
 
 
+SANDBOX_IMPORT_HINT = (
+    "\n\nIMPORTANT: this repair will run inside a fresh subprocess sandbox. "
+    "The child namespace does NOT inherit the caller's imports. "
+    "The repaired function MUST import every module it uses at the top of "
+    "the function body (e.g. `import math` inside the function), or the "
+    "first sandboxed call will raise NameError."
+)
+
+
 def build_messages(
     source: str,
     failure: Failure,
     history: list[RepairAttempt] | None = None,
     extra: str | None = None,
+    sandbox: bool = False,
 ) -> tuple[str, str]:
     """Build (system, user) prompt pair for a repair request.
 
     `history` lets the model see and avoid repeating prior failed fixes.
     `extra` is appended as free-form user instructions.
+    `sandbox` signals that the repair will run in a subprocess sandbox,
+    so the system prompt is extended with an explicit "import everything
+    you use" reminder (see :mod:`self_heal.sandbox`). Without this reminder
+    the LLM often omits module-level imports (e.g. `math`), and the first
+    sandboxed call fails with `NameError`.
     """
     history_section = _format_history(history) if history else ""
     extra_section = f"\nADDITIONAL USER INSTRUCTIONS:\n{extra}\n" if extra else ""
@@ -71,7 +86,8 @@ def build_messages(
         history_section=history_section,
         extra_section=extra_section,
     )
-    return REPAIR_SYSTEM, user
+    system = REPAIR_SYSTEM + SANDBOX_IMPORT_HINT if sandbox else REPAIR_SYSTEM
+    return system, user
 
 
 def extract_code(text: str) -> str:
