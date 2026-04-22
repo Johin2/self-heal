@@ -1,4 +1,3 @@
-Blame
 """Mistral AI proposer."""
 
 from __future__ import annotations
@@ -56,7 +55,7 @@ class MistralProposer:
         return _extract_text(message)
 
     async def apropose(self, system: str, user: str) -> str:
-        message = await self.aclient.chat.complete(
+        message = await self.aclient.chat.complete_async(
             model=self.model,
             max_tokens=self.max_tokens,
             messages=[
@@ -80,7 +79,7 @@ class MistralProposer:
                 yield chunk.data.choices[0].delta.content
 
     async def apropose_stream(self, system: str, user: str):
-        stream = await self.aclient.chat.stream(
+        stream = await self.aclient.chat.stream_async(
             model=self.model,
             max_tokens=self.max_tokens,
             messages=[
