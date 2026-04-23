@@ -28,9 +28,16 @@ class FireworksProposer(OpenAIProposer):
         api_key: str | None = None,
         max_tokens: int | None = None,
     ) -> None:
+        resolved_key = api_key or os.environ.get("FIREWORKS_API_KEY")
+        if resolved_key is None:
+            raise ValueError(
+                "FireworksProposer requires a Fireworks API key. "
+                "Set FIREWORKS_API_KEY or pass api_key=...; "
+                "OPENAI_API_KEY is intentionally NOT used here."
+            )
         super().__init__(
             model=model,
-            api_key=api_key or os.environ.get("FIREWORKS_API_KEY"),
+            api_key=resolved_key,
             base_url="https://api.fireworks.ai/inference/v1",
             max_tokens=max_tokens,
         )
