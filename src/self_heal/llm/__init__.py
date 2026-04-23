@@ -17,9 +17,11 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from self_heal.llm._claude import ClaudeProposer
+    from self_heal.llm._fireworks import FireworksProposer
     from self_heal.llm._gemini import GeminiProposer
     from self_heal.llm._litellm import LiteLLMProposer
     from self_heal.llm._openai import OpenAIProposer
+    from self_heal.llm._together import TogetherProposer
 
 
 class LLMProposer(Protocol):
@@ -47,10 +49,10 @@ def __getattr__(name: str) -> Any:
         from self_heal.llm._claude import ClaudeProposer
 
         return ClaudeProposer
-    if name == "OpenAIProposer":
-        from self_heal.llm._openai import OpenAIProposer
+    if name == "FireworksProposer":
+        from self_heal.llm._fireworks import FireworksProposer
 
-        return OpenAIProposer
+        return FireworksProposer
     if name == "GeminiProposer":
         from self_heal.llm._gemini import GeminiProposer
 
@@ -59,13 +61,23 @@ def __getattr__(name: str) -> Any:
         from self_heal.llm._litellm import LiteLLMProposer
 
         return LiteLLMProposer
+    if name == "OpenAIProposer":
+        from self_heal.llm._openai import OpenAIProposer
+
+        return OpenAIProposer
+    if name == "TogetherProposer":
+        from self_heal.llm._together import TogetherProposer
+
+        return TogetherProposer
     raise AttributeError(f"module 'self_heal.llm' has no attribute {name!r}")
 
 
 __all__ = [
     "ClaudeProposer",
+    "FireworksProposer",
     "GeminiProposer",
     "LLMProposer",
     "LiteLLMProposer",
     "OpenAIProposer",
+    "TogetherProposer",
 ]

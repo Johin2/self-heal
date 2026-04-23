@@ -334,3 +334,67 @@ def test_repair_loop_rejects_invalid_max_attempts():
 
     with pytest.raises(ValueError):
         RepairLoop(max_attempts=0)
+
+
+# ---------------------------------------------------------------------------
+# FireworksProposer
+# ---------------------------------------------------------------------------
+
+
+def test_fireworks_proposer_uses_fireworks_defaults(monkeypatch):
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-test-key")
+    mock_client = MagicMock()
+    with patch("self_heal.llm._openai.OpenAI", return_value=mock_client) as mock_openai:
+        from self_heal.llm import FireworksProposer
+
+        FireworksProposer()
+
+    mock_openai.assert_called_once_with(
+        api_key="fw-test-key",
+        base_url="https://api.fireworks.ai/inference/v1",
+    )
+
+
+def test_fireworks_proposer_accepts_explicit_api_key():
+    mock_client = MagicMock()
+    with patch("self_heal.llm._openai.OpenAI", return_value=mock_client) as mock_openai:
+        from self_heal.llm import FireworksProposer
+
+        FireworksProposer(api_key="explicit-fw-key")
+
+    mock_openai.assert_called_once_with(
+        api_key="explicit-fw-key",
+        base_url="https://api.fireworks.ai/inference/v1",
+    )
+
+
+# ---------------------------------------------------------------------------
+# TogetherProposer
+# ---------------------------------------------------------------------------
+
+
+def test_together_proposer_uses_together_defaults(monkeypatch):
+    monkeypatch.setenv("TOGETHER_API_KEY", "tg-test-key")
+    mock_client = MagicMock()
+    with patch("self_heal.llm._openai.OpenAI", return_value=mock_client) as mock_openai:
+        from self_heal.llm import TogetherProposer
+
+        TogetherProposer()
+
+    mock_openai.assert_called_once_with(
+        api_key="tg-test-key",
+        base_url="https://api.together.xyz/v1",
+    )
+
+
+def test_together_proposer_accepts_explicit_api_key():
+    mock_client = MagicMock()
+    with patch("self_heal.llm._openai.OpenAI", return_value=mock_client) as mock_openai:
+        from self_heal.llm import TogetherProposer
+
+        TogetherProposer(api_key="explicit-tg-key")
+
+    mock_openai.assert_called_once_with(
+        api_key="explicit-tg-key",
+        base_url="https://api.together.xyz/v1",
+    )
