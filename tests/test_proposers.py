@@ -1,4 +1,4 @@
-"""Unit tests for the four LLM proposer adapters.
+"""Unit tests for the five LLM proposer adapters.
 
 All tests mock the underlying SDK — no network calls, no API keys needed.
 """
@@ -12,6 +12,7 @@ import pytest
 from self_heal.llm import (
     ClaudeProposer,
     GeminiProposer,
+    GroqProposer,
     LiteLLMProposer,
     OpenAIProposer,
 )
@@ -167,6 +168,29 @@ def test_openai_proposer_handles_none_content():
         result = OpenAIProposer(api_key="x").propose("s", "u")
 
     assert result == ""
+
+
+def test_groq_proposer_sets_default_base_url_and_model(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "env-groq-key")
+    with patch("self_heal.llm._openai.OpenAI") as MockOpenAI:
+        proposer = GroqProposer()
+
+    MockOpenAI.assert_called_once_with(
+        api_key="env-groq-key",
+        base_url="https://api.groq.com/openai/v1",
+    )
+    assert proposer.model == "llama-3.3-70b-versatile"
+
+
+def test_groq_proposer_explicit_api_key_overrides_env(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    with patch("self_heal.llm._openai.OpenAI") as MockOpenAI:
+        GroqProposer(api_key="explicit")
+
+    MockOpenAI.assert_called_once_with(
+        api_key="explicit",
+        base_url="https://api.groq.com/openai/v1",
+    )
 
 
 # ---------------------------------------------------------------------------
