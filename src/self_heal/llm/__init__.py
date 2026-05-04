@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from self_heal.llm._claude import ClaudeProposer
     from self_heal.llm._gemini import GeminiProposer
+    from self_heal.llm._groq import GroqProposer
     from self_heal.llm._litellm import LiteLLMProposer
     from self_heal.llm._openai import OpenAIProposer
 
@@ -51,6 +52,10 @@ def __getattr__(name: str) -> Any:
         from self_heal.llm._openai import OpenAIProposer
 
         return OpenAIProposer
+    if name == "GroqProposer":
+        from self_heal.llm._groq import GroqProposer
+
+        return GroqProposer
     if name == "GeminiProposer":
         from self_heal.llm._gemini import GeminiProposer
 
@@ -65,6 +70,7 @@ def __getattr__(name: str) -> Any:
 __all__ = [
     "ClaudeProposer",
     "GeminiProposer",
+    "GroqProposer",
     "LLMProposer",
     "LiteLLMProposer",
     "OpenAIProposer",
