@@ -54,6 +54,7 @@ The +2 tasks on each suite share a pattern: the first proposed fix handles one e
 
 ```bash
 pip install 'self-heal-llm[claude]'    # Anthropic Claude (default)
+pip install 'self-heal-llm[cohere]'    # Cohere
 pip install 'self-heal-llm[openai]'    # OpenAI + OpenAI-compatible endpoints
 pip install 'self-heal-llm[gemini]'    # Google Gemini
 pip install 'self-heal-llm[litellm]'   # 100+ providers via LiteLLM
@@ -67,6 +68,7 @@ pip install 'self-heal-llm[all]'       # everything
 | Adapter | Covers |
 |---|---|
 | `ClaudeProposer` | Anthropic Claude (native SDK) |
+| `CohereProposer` | Cohere (native SDK) |
 | `OpenAIProposer` | OpenAI + **any OpenAI-compatible endpoint** (OpenRouter, Together, Groq, Fireworks, Anyscale, Perplexity, xAI, DeepSeek, Azure, Ollama, LM Studio, vLLM, llama.cpp server, ...) |
 | `GeminiProposer` | Google Gemini (native SDK) |
 | `LiteLLMProposer` | 100+ providers via LiteLLM (Bedrock, Vertex, Cohere, Mistral, ...) |
