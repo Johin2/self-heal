@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         TogetherProposer,
     )
 
-__version__ = "0.4.2"
+__version__ = "0.5.0"
 
 
 def __getattr__(name: str) -> Any:
