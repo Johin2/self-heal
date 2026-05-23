@@ -68,6 +68,7 @@ pip install 'self-heal-llm[all]'       # everything
 |---|---|
 | `ClaudeProposer` | Anthropic Claude (native SDK) |
 | `OpenAIProposer` | OpenAI + **any OpenAI-compatible endpoint** (OpenRouter, Together, Groq, Fireworks, Anyscale, Perplexity, xAI, DeepSeek, Azure, Ollama, LM Studio, vLLM, llama.cpp server, ...) |
+| `GroqProposer` | Groq (OpenAI-compatible; reads `GROQ_API_KEY`, defaults to Llama 3.3 70B) |
 | `GeminiProposer` | Google Gemini (native SDK) |
 | `LiteLLMProposer` | 100+ providers via LiteLLM (Bedrock, Vertex, Cohere, Mistral, ...) |
 
