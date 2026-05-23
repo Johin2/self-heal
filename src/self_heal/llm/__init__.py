@@ -3,6 +3,7 @@
 Install only the adapters you need:
 
     pip install 'self-heal[claude]'    # Anthropic Claude
+    pip install 'self-heal[cohere]'    # Cohere
     pip install 'self-heal[openai]'    # OpenAI + OpenAI-compatible endpoints
     pip install 'self-heal[gemini]'    # Google Gemini
     pip install 'self-heal[litellm]'   # 100+ providers via LiteLLM
@@ -17,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from self_heal.llm._claude import ClaudeProposer
+    from self_heal.llm._cohere import CohereProposer
     from self_heal.llm._fireworks import FireworksProposer
     from self_heal.llm._gemini import GeminiProposer
     from self_heal.llm._groq import GroqProposer
@@ -50,6 +52,10 @@ def __getattr__(name: str) -> Any:
         from self_heal.llm._claude import ClaudeProposer
 
         return ClaudeProposer
+    if name == "CohereProposer":
+        from self_heal.llm._cohere import CohereProposer
+
+        return CohereProposer
     if name == "FireworksProposer":
         from self_heal.llm._fireworks import FireworksProposer
 
@@ -79,6 +85,7 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "ClaudeProposer",
+    "CohereProposer",
     "FireworksProposer",
     "GeminiProposer",
     "GroqProposer",

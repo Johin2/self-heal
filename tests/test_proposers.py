@@ -11,6 +11,7 @@ import pytest
 
 from self_heal.llm import (
     ClaudeProposer,
+    CohereProposer,
     GeminiProposer,
     GroqProposer,
     LiteLLMProposer,
@@ -90,6 +91,70 @@ def test_claude_proposer_respects_custom_max_tokens():
         ClaudeProposer(api_key="x", max_tokens=512).propose("s", "u")
 
     assert mock_client.messages.create.call_args.kwargs["max_tokens"] == 512
+
+
+# ---------------------------------------------------------------------------
+# CohereProposer
+# ---------------------------------------------------------------------------
+
+
+def _cohere_response(content: str | None) -> MagicMock:
+    block = MagicMock()
+    block.text = content
+    message = MagicMock()
+    message.content = [block]
+    response = MagicMock()
+    response.message = message
+    return response
+
+
+def test_cohere_proposer_returns_message_content():
+    mock_client = MagicMock()
+    mock_client.chat.return_value = _cohere_response("def foo(): return 42")
+
+    with patch("self_heal.llm._cohere.ClientV2", return_value=mock_client):
+        result = CohereProposer(model="command-r-plus", api_key="test").propose(
+            "sys", "user"
+        )
+
+    assert result == "def foo(): return 42"
+    kwargs = mock_client.chat.call_args.kwargs
+    assert kwargs["model"] == "command-r-plus"
+    assert kwargs["messages"] == [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "user"},
+    ]
+    assert "max_tokens" not in kwargs
+
+
+def test_cohere_proposer_reads_api_key_from_env(monkeypatch):
+    monkeypatch.setenv("COHERE_API_KEY", "env-cohere-key")
+    with patch("self_heal.llm._cohere.ClientV2") as MockClient:
+        CohereProposer()
+
+    MockClient.assert_called_once_with(api_key="env-cohere-key")
+
+
+def test_cohere_proposer_forwards_max_tokens():
+    mock_client = MagicMock()
+    mock_client.chat.return_value = _cohere_response("code")
+
+    with patch("self_heal.llm._cohere.ClientV2", return_value=mock_client):
+        CohereProposer(api_key="x", max_tokens=512).propose("s", "u")
+
+    assert mock_client.chat.call_args.kwargs["max_tokens"] == 512
+
+
+def test_cohere_proposer_handles_empty_content():
+    mock_client = MagicMock()
+    response = MagicMock()
+    response.message.content = []
+    mock_client.chat.return_value = response
+
+    with patch("self_heal.llm._cohere.ClientV2", return_value=mock_client):
+        result = CohereProposer(api_key="x").propose("s", "u")
+
+    assert result == ""
 
 
 # ---------------------------------------------------------------------------
