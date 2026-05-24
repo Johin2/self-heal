@@ -57,6 +57,7 @@ pip install 'self-heal-llm[claude]'    # Anthropic Claude (default)
 pip install 'self-heal-llm[cohere]'    # Cohere
 pip install 'self-heal-llm[openai]'    # OpenAI + OpenAI-compatible endpoints
 pip install 'self-heal-llm[gemini]'    # Google Gemini
+pip install 'self-heal-llm[mistral]'   # Mistral AI
 pip install 'self-heal-llm[litellm]'   # 100+ providers via LiteLLM
 pip install 'self-heal-llm[all]'       # everything
 ```
@@ -76,6 +77,7 @@ pip install 'self-heal-llm[all]'       # everything
 | `FireworksProposer` | Fireworks AI (Llama, Qwen, Mixtral, DeepSeek hosted models) |
 | `TogetherProposer` | Together AI (Llama, Qwen, DeepSeek hosted models) |
 | `GeminiProposer` | Google Gemini (native SDK) |
+| `MistralProposer` | Mistral AI (native SDK; reads `MISTRAL_API_KEY`, defaults to `mistral-large-latest`, supports sync / async / streaming) |
 | `LiteLLMProposer` | 100+ providers via LiteLLM (Bedrock, Vertex, Cohere, Mistral, ...) |
 
 ## Features
@@ -270,6 +272,14 @@ def my_fn(...): ...
 from self_heal.llm import GeminiProposer
 
 @repair(proposer=GeminiProposer(model="gemini-2.5-pro"))
+def my_fn(...): ...
+```
+
+**Mistral:**
+```python
+from self_heal.llm import MistralProposer
+
+@repair(proposer=MistralProposer(model="mistral-large-latest"))
 def my_fn(...): ...
 ```
 

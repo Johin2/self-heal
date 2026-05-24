@@ -15,6 +15,7 @@ from self_heal.llm import (
     GeminiProposer,
     GroqProposer,
     LiteLLMProposer,
+    MistralProposer,
     OpenAIProposer,
 )
 
@@ -487,3 +488,64 @@ def test_together_proposer_accepts_explicit_api_key():
         api_key="explicit-tg-key",
         base_url="https://api.together.xyz/v1",
     )
+
+
+# ---------------------------------------------------------------------------
+# MistralProposer
+# ---------------------------------------------------------------------------
+
+
+def _mistral_response(content: str | None) -> MagicMock:
+    choice = MagicMock()
+    choice.message.content = content
+    response = MagicMock()
+    response.choices = [choice]
+    return response
+
+
+def test_mistral_proposer_returns_message_content():
+    mock_client = MagicMock()
+    mock_client.chat.complete.return_value = _mistral_response("def foo(): return 42")
+
+    with patch("self_heal.llm._mistral.Mistral", return_value=mock_client):
+        proposer = MistralProposer(model="mistral-large-latest", api_key="test-key")
+        result = proposer.propose("sys", "user")
+
+    assert result == "def foo(): return 42"
+    kwargs = mock_client.chat.complete.call_args.kwargs
+    assert kwargs["model"] == "mistral-large-latest"
+    assert kwargs["messages"] == [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "user"},
+    ]
+    assert kwargs["max_tokens"] == 2048
+
+
+def test_mistral_proposer_reads_api_key_from_env(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "env-mistral-key")
+    with patch("self_heal.llm._mistral.Mistral") as MockMistral:
+        MistralProposer()
+
+    MockMistral.assert_called_once_with(api_key="env-mistral-key")
+
+
+def test_mistral_proposer_respects_custom_max_tokens():
+    mock_client = MagicMock()
+    mock_client.chat.complete.return_value = _mistral_response("code")
+
+    with patch("self_heal.llm._mistral.Mistral", return_value=mock_client):
+        MistralProposer(api_key="x", max_tokens=512).propose("s", "u")
+
+    assert mock_client.chat.complete.call_args.kwargs["max_tokens"] == 512
+
+
+def test_mistral_proposer_handles_empty_choices():
+    mock_client = MagicMock()
+    empty = MagicMock()
+    empty.choices = []
+    mock_client.chat.complete.return_value = empty
+
+    with patch("self_heal.llm._mistral.Mistral", return_value=mock_client):
+        result = MistralProposer(api_key="x").propose("s", "u")
+
+    assert result == ""

@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 
 try:
-    from mistralai import Mistral
+    from mistralai.client import Mistral
 except ImportError as _err:  # pragma: no cover
     raise ImportError(
-        "MistralProposer requires the `mistralai` package. "
-        "Install with: pip install 'self-heal[mistralai]'"
+        "MistralProposer requires the `mistralai` package (>=2.0). "
+        "Install with: pip install 'self-heal-llm[mistral]'"
     ) from _err
 
 
@@ -64,7 +64,7 @@ class MistralProposer:
             ],
         )
         return _extract_text(message)
-        
+
     def propose_stream(self, system: str, user: str):
         stream = self.client.chat.stream(
             model=self.model,
