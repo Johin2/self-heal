@@ -45,6 +45,7 @@ openai = ["openai>=1.40.0"]
 gemini = ["google-genai>=0.3.0"]
 mistral = ["mistralai>=2.0.0"]
 litellm = ["litellm>=1.0.0"]
+control-plane = ["httpx>=0.28.0"]
 all = [
     "anthropic>=0.40.0",
     "cohere>=5.0.0",
@@ -62,6 +63,7 @@ dev = [
     "google-genai>=0.3.0",
     "mistralai>=2.0.0",
     "litellm>=1.0.0",
+    "httpx>=0.28.0",
     # integration packages (tested in CI; optional for end users)
     "claude-agent-sdk>=0.1.0",
     "langchain-core>=0.3.0",
