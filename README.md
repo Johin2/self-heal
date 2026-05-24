@@ -406,3 +406,7 @@ python benchmarks/run.py --suite quixbugs --proposer gemini      # QuixBugs (40 
 ## License
 
 MIT
+
+pip install self-heal-llm
+
+> The `GroqProposer`, `FireworksProposer`, and `TogetherProposer` adapters share the `openai` SDK; install with `pip install 'self-heal-llm[openai]'`.
