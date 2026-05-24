@@ -6,6 +6,7 @@ Install only the adapters you need:
     pip install 'self-heal[cohere]'    # Cohere
     pip install 'self-heal[openai]'    # OpenAI + OpenAI-compatible endpoints
     pip install 'self-heal[gemini]'    # Google Gemini
+    pip install 'self-heal[mistral]'   # Mistral AI
     pip install 'self-heal[litellm]'   # 100+ providers via LiteLLM
     pip install 'self-heal[all]'       # everything
 
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from self_heal.llm._gemini import GeminiProposer
     from self_heal.llm._groq import GroqProposer
     from self_heal.llm._litellm import LiteLLMProposer
+    from self_heal.llm._mistral import MistralProposer
     from self_heal.llm._openai import OpenAIProposer
     from self_heal.llm._together import TogetherProposer
 
@@ -72,6 +74,10 @@ def __getattr__(name: str) -> Any:
         from self_heal.llm._litellm import LiteLLMProposer
 
         return LiteLLMProposer
+    if name == "MistralProposer":
+        from self_heal.llm._mistral import MistralProposer
+
+        return MistralProposer
     if name == "OpenAIProposer":
         from self_heal.llm._openai import OpenAIProposer
 
@@ -91,6 +97,7 @@ __all__ = [
     "GroqProposer",
     "LLMProposer",
     "LiteLLMProposer",
+    "MistralProposer",
     "OpenAIProposer",
     "TogetherProposer",
 ]

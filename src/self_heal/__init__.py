@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         GeminiProposer,
         GroqProposer,
         LiteLLMProposer,
+        MistralProposer,
         OpenAIProposer,
         TogetherProposer,
     )
@@ -36,6 +37,7 @@ def __getattr__(name: str) -> Any:
         "GeminiProposer",
         "GroqProposer",
         "LiteLLMProposer",
+        "MistralProposer",
         "OpenAIProposer",
         "TogetherProposer",
     }:
@@ -55,6 +57,7 @@ __all__ = [
     "GroqProposer",
     "LLMProposer",
     "LiteLLMProposer",
+    "MistralProposer",
     "OpenAIProposer",
     "RepairAttempt",
     "RepairCache",
