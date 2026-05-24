@@ -16,8 +16,10 @@ from self_heal.verify import Test, Verifier, check_tests, check_verifier
 if TYPE_CHECKING:
     from self_heal.llm import (
         ClaudeProposer,
+        CohereProposer,
         FireworksProposer,
         GeminiProposer,
+        GroqProposer,
         LiteLLMProposer,
         OpenAIProposer,
         TogetherProposer,
@@ -29,8 +31,10 @@ __version__ = "0.5.0"
 def __getattr__(name: str) -> Any:
     if name in {
         "ClaudeProposer",
+        "CohereProposer",
         "FireworksProposer",
         "GeminiProposer",
+        "GroqProposer",
         "LiteLLMProposer",
         "OpenAIProposer",
         "TogetherProposer",
@@ -43,10 +47,12 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "ClaudeProposer",
+    "CohereProposer",
     "EventCallback",
     "Failure",
     "FireworksProposer",
     "GeminiProposer",
+    "GroqProposer",
     "LLMProposer",
     "LiteLLMProposer",
     "OpenAIProposer",
