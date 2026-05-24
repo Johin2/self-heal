@@ -61,6 +61,8 @@ pip install 'self-heal-llm[litellm]'   # 100+ providers via LiteLLM
 pip install 'self-heal-llm[all]'       # everything
 ```
 
+> **Note:** The `GroqProposer`, `FireworksProposer`, and `TogetherProposer` adapters share the `openai` SDK; install with `pip install 'self-heal-llm[openai]'`.
+
 > PyPI distribution name is `self-heal-llm` (the short name `self-heal` was blocked by PyPI's similarity check with an unrelated package). The Python import stays `from self_heal import ...`.
 
 ## Provider support
