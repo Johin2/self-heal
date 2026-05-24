@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import engine
-from app.routes import ingest
+from app.routes import auth, ingest, metrics, policy, runs
 
 settings = get_settings()
 
@@ -19,6 +19,10 @@ app.add_middleware(
 )
 
 app.include_router(ingest.router)
+app.include_router(auth.router)
+app.include_router(runs.router)
+app.include_router(metrics.router)
+app.include_router(policy.router)
 
 
 @app.get("/health")
