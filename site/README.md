@@ -13,13 +13,23 @@ npm run build     # type-check + prod build
 
 ## Waitlist backend
 
-`app/api/waitlist/route.ts` currently appends emails to `.waitlist/emails.jsonl` on the local filesystem. On Vercel this will fail silently (read-only FS) and log to console.
+`app/api/waitlist/route.ts` writes signups to a Neon Postgres database (table `waitlist_signups`). Every request also emits a structured `WAITLIST_SIGNUP {...}` line in the Vercel logs as a secondary trail.
 
-Swap for a real backend before launch. Easiest options:
+### Setup
 
-1. **Formspree** (free 50/mo): replace the fetch call with the Formspree endpoint.
-2. **Resend + Postgres**: install `resend`, add a Postgres DB, persist + send a welcome email.
-3. **Convex / Supabase**: full backend-as-a-service with a free tier.
+1. Create a project at [neon.tech](https://console.neon.tech/) and grab the **pooled** connection string.
+2. Copy `.env.example` to `.env.local` and paste the URL into `DATABASE_URL`.
+3. Run the migration in `db/001_waitlist.sql` — paste it into the Neon SQL editor, or:
+   ```bash
+   psql "$DATABASE_URL" -f db/001_waitlist.sql
+   ```
+4. For production, add `DATABASE_URL` as an env var in the Vercel project settings.
+
+### Inspecting signups
+
+```sql
+SELECT email, ts FROM waitlist_signups ORDER BY ts DESC LIMIT 100;
+```
 
 ## Deploy
 

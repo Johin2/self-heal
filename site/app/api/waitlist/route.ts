@@ -1,17 +1,8 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { neon } from "@neondatabase/serverless";
 
-/**
- * Simple waitlist endpoint.
- *
- * For now, appends to a JSONL file under `.waitlist/emails.jsonl`.
- * Swap this for a real backend (Resend + Postgres, Convex, Supabase,
- * Formspree) before heavy traffic. Configure via WAITLIST_BACKEND env
- * var once you pick one.
- */
-
-const WAITLIST_FILE = path.join(process.cwd(), ".waitlist", "emails.jsonl");
+const databaseUrl = process.env.DATABASE_URL;
+const sql = databaseUrl ? neon(databaseUrl) : null;
 
 function isValidEmail(e: unknown): e is string {
   return (
@@ -34,24 +25,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
   }
 
-  const record = JSON.stringify({
-    email,
-    ts: new Date().toISOString(),
-    ip: request.headers.get("x-forwarded-for") ?? null,
-    ua: request.headers.get("user-agent") ?? null,
-  });
+  const ip = request.headers.get("x-forwarded-for") ?? null;
+  const ua = request.headers.get("user-agent") ?? null;
 
-  // Always emit a greppable structured log line. On Vercel this is
-  // visible under Logs in the project dashboard and is the only
-  // durable capture path until we swap to a real backend.
-  console.log(`WAITLIST_SIGNUP ${record}`);
+  // Always emit a structured log line first so Vercel logs hold a recovery
+  // trail even if the DB write fails.
+  console.log(
+    `WAITLIST_SIGNUP ${JSON.stringify({
+      email,
+      ts: new Date().toISOString(),
+      ip,
+      ua,
+    })}`,
+  );
+
+  if (!sql) {
+    console.error("WAITLIST_DB_ERROR DATABASE_URL is not configured");
+    return NextResponse.json(
+      { error: "Waitlist is not configured. Please try again later." },
+      { status: 500 },
+    );
+  }
 
   try {
-    await fs.mkdir(path.dirname(WAITLIST_FILE), { recursive: true });
-    await fs.appendFile(WAITLIST_FILE, record + "\n", "utf-8");
-  } catch {
-    // Serverless platforms have a read-only filesystem; the structured
-    // log above is the durable record in that case.
+    await sql`
+      INSERT INTO waitlist_signups (email, ip, user_agent)
+      VALUES (${email}, ${ip}, ${ua})
+      ON CONFLICT (email) DO NOTHING
+    `;
+  } catch (err) {
+    console.error("WAITLIST_DB_ERROR", err);
+    return NextResponse.json(
+      { error: "Could not record signup, please try again." },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ ok: true });
