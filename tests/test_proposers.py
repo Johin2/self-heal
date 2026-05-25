@@ -5,7 +5,9 @@ All tests mock the underlying SDK — no network calls, no API keys needed.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -109,6 +111,19 @@ def _cohere_response(content: str | None) -> MagicMock:
     return response
 
 
+def _cohere_stream_chunk(content: str | None) -> SimpleNamespace:
+    block = SimpleNamespace(text=content)
+    return SimpleNamespace(
+        delta=SimpleNamespace(message=SimpleNamespace(content=[block]))
+    )
+
+
+async def _async_iter(items):
+    for item in items:
+        await asyncio.sleep(0)
+        yield item
+
+
 def test_cohere_proposer_returns_message_content():
     mock_client = MagicMock()
     mock_client.chat.return_value = _cohere_response("def foo(): return 42")
@@ -156,6 +171,79 @@ def test_cohere_proposer_handles_empty_content():
         result = CohereProposer(api_key="x").propose("s", "u")
 
     assert result == ""
+
+
+def test_cohere_proposer_uses_native_async_client():
+    mock_sync_client = MagicMock()
+    mock_async_client = MagicMock()
+    mock_async_client.chat = AsyncMock(
+        return_value=_cohere_response("async repair")
+    )
+
+    with (
+        patch("self_heal.llm._cohere.ClientV2", return_value=mock_sync_client),
+        patch("self_heal.llm._cohere.AsyncClientV2", return_value=mock_async_client),
+    ):
+        proposer = CohereProposer(model="command-r-plus", api_key="test")
+        result = asyncio.run(proposer.apropose("sys", "user"))
+
+    assert result == "async repair"
+    mock_sync_client.chat.assert_not_called()
+    kwargs = mock_async_client.chat.call_args.kwargs
+    assert kwargs["model"] == "command-r-plus"
+    assert kwargs["messages"] == [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "user"},
+    ]
+
+
+def test_cohere_proposer_streams_text_chunks():
+    mock_client = MagicMock()
+    mock_client.chat_stream.return_value = [
+        _cohere_stream_chunk("def "),
+        _cohere_stream_chunk("foo"),
+        _cohere_stream_chunk(None),
+    ]
+
+    with patch("self_heal.llm._cohere.ClientV2", return_value=mock_client):
+        proposer = CohereProposer(api_key="test")
+        chunks = list(proposer.propose_stream("sys", "user"))
+
+    assert chunks == ["def ", "foo"]
+    kwargs = mock_client.chat_stream.call_args.kwargs
+    assert kwargs["messages"] == [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "user"},
+    ]
+
+
+def test_cohere_proposer_streams_text_chunks_async():
+    mock_async_client = MagicMock()
+    mock_async_client.chat_stream.return_value = _async_iter(
+        [
+            _cohere_stream_chunk("async "),
+            _cohere_stream_chunk("foo"),
+            _cohere_stream_chunk(None),
+        ]
+    )
+
+    async def collect():
+        with (
+            patch("self_heal.llm._cohere.ClientV2"),
+            patch(
+                "self_heal.llm._cohere.AsyncClientV2",
+                return_value=mock_async_client,
+            ),
+        ):
+            proposer = CohereProposer(api_key="test")
+            return [chunk async for chunk in proposer.apropose_stream("sys", "user")]
+
+    assert asyncio.run(collect()) == ["async ", "foo"]
+    kwargs = mock_async_client.chat_stream.call_args.kwargs
+    assert kwargs["messages"] == [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "user"},
+    ]
 
 
 # ---------------------------------------------------------------------------
