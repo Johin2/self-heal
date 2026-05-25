@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -60,7 +60,7 @@ async def metrics(
     session: AsyncSession = Depends(get_session),
 ) -> MetricsResponse:
     delta = _RANGE_MAP.get(range, _RANGE_MAP["7d"])
-    since = datetime.now(timezone.utc) - delta
+    since = datetime.now(UTC) - delta
 
     base = (RepairRun.project_id == project.id, RepairRun.started_at >= since)
 

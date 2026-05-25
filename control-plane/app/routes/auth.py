@@ -12,7 +12,7 @@ Flow:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
@@ -23,7 +23,8 @@ from app.auth import SESSION_COOKIE, current_user
 from app.config import get_settings
 from app.db import get_session
 from app.email import send_magic_link
-from app.models import MagicLinkToken, Session as SessionRow, User
+from app.models import MagicLinkToken, User
+from app.models import Session as SessionRow
 from app.schemas import MagicLinkRequest, MagicLinkResponse
 from app.security import new_magic_link_token, new_session_token
 
@@ -63,7 +64,7 @@ async def request_link(
 ) -> MagicLinkResponse:
     settings = get_settings()
     plaintext, token_hash = new_magic_link_token()
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.magic_link_ttl_minutes)
+    expires_at = datetime.now(UTC) + timedelta(minutes=settings.magic_link_ttl_minutes)
 
     session.add(
         MagicLinkToken(
@@ -91,7 +92,7 @@ async def verify(
     import hashlib
 
     token_hash = hashlib.sha256(body.token.encode("utf-8")).hexdigest()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     row = (
         await session.execute(
@@ -142,7 +143,7 @@ async def logout(
     await session.execute(
         update(SessionRow)
         .where(SessionRow.user_id == user.id, SessionRow.revoked_at.is_(None))
-        .values(revoked_at=datetime.now(timezone.utc))
+        .values(revoked_at=datetime.now(UTC))
     )
     await session.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")

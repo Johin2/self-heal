@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select, update
@@ -74,7 +74,7 @@ async def authenticate_api_key(
     await session.execute(
         update(ApiKey)
         .where(ApiKey.id == api_key.id)
-        .values(last_used_at=datetime.now(timezone.utc))
+        .values(last_used_at=datetime.now(UTC))
     )
     await session.commit()
     return api_key, project

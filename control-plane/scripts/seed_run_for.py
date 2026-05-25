@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -37,7 +37,7 @@ async def main(email: str) -> int:
         plaintext, prefix, key_hash = generate_api_key()
         session.add(ApiKey(project_id=project.id, name="seed key", prefix=prefix, key_hash=key_hash))
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         run_key = f"demo-{uuid.uuid4().hex[:8]}"
         run = RepairRun(
             project_id=project.id,

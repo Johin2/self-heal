@@ -8,7 +8,7 @@ sessions table for an active row tied to a user.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy import select
@@ -33,7 +33,7 @@ async def current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not signed in")
 
     token_hash = _hash(cp_session)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = (
         select(SessionRow, User)
         .join(User, User.id == SessionRow.user_id)

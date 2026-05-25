@@ -19,6 +19,7 @@ dropped.
 from __future__ import annotations
 
 import atexit
+import contextlib
 import dataclasses
 import logging
 import threading
@@ -139,7 +140,7 @@ class ControlPlaneClient:
 
     def for_function(
         self, function_name: str, module_name: str | None = None
-    ) -> "_BoundCallback":
+    ) -> _BoundCallback:
         return _BoundCallback(self, function_name, module_name)
 
     def __call__(self, event: RepairEvent) -> None:
@@ -179,10 +180,8 @@ class ControlPlaneClient:
         self._wake.set()
         self.flush(timeout=2.0)
         self._flusher.join(timeout=2.0)
-        try:
+        with contextlib.suppress(Exception):
             self._client.close()
-        except Exception:  # noqa: BLE001
-            pass
 
     # -- internals -------------------------------------------------------
 

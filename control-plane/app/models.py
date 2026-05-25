@@ -53,8 +53,8 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    sessions: Mapped[list["Session"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    projects: Mapped[list["Project"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    sessions: Mapped[list[Session]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    projects: Mapped[list[Project]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
 class MagicLinkToken(Base):
@@ -102,9 +102,9 @@ class Project(Base):
     created_at: Mapped[datetime] = _ts_now()
 
     owner: Mapped[User] = relationship(back_populates="projects")
-    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="project", cascade="all, delete-orphan")
-    runs: Mapped[list["RepairRun"]] = relationship(back_populates="project", cascade="all, delete-orphan")
-    policy_rules: Mapped[list["PolicyRule"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    api_keys: Mapped[list[ApiKey]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    runs: Mapped[list[RepairRun]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    policy_rules: Mapped[list[PolicyRule]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class ApiKey(Base):
@@ -150,7 +150,7 @@ class RepairRun(Base):
     final_source: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     project: Mapped[Project] = relationship(back_populates="runs")
-    events: Mapped[list["RepairEvent"]] = relationship(
+    events: Mapped[list[RepairEvent]] = relationship(
         back_populates="run", cascade="all, delete-orphan", order_by="RepairEvent.ts"
     )
 

@@ -13,7 +13,7 @@ import asyncio
 import os
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -31,7 +31,7 @@ def _event(
 ) -> dict:
     return {
         "event_id": str(uuid.uuid4()),
-        "ts": (when or datetime.now(timezone.utc)).isoformat(),
+        "ts": (when or datetime.now(UTC)).isoformat(),
         "run_key": run_key,
         "type": type_,
         "function_name": fn,
@@ -48,7 +48,7 @@ async def main() -> int:
         return 2
 
     run_key = f"demo-run-{uuid.uuid4().hex[:8]}"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     events = [
         _event(run_key, "attempt_start", attempt=1, when=now),

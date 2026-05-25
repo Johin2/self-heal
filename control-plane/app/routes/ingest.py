@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -76,7 +76,7 @@ async def post_events(
     for event in sorted(batch.events, key=lambda e: e.ts):
         run = await _open_or_get_run(session, project.id, event)
 
-        ts = event.ts if event.ts.tzinfo else event.ts.replace(tzinfo=timezone.utc)
+        ts = event.ts if event.ts.tzinfo else event.ts.replace(tzinfo=UTC)
 
         stmt = (
             pg_insert(RepairEvent)
