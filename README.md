@@ -357,6 +357,8 @@ Examples in [`examples/`](examples):
 - [`with_langchain.py`](examples/with_langchain.py)
 - [`with_crewai.py`](examples/with_crewai.py)
 
+All examples are smoke-tested on every CI run via [`tests/test_examples_import.py`](tests/test_examples_import.py).
+
 ## Safety
 
 `self-heal` executes LLM-generated code via `exec()` in the same process by default. Three layers of defense are available:
