@@ -33,7 +33,7 @@ EventType = Literal[
     "verify_success",
     "repair_succeeded",
     "repair_exhausted",
-    "retry",
+    "transient_retry",
 ]
 
 

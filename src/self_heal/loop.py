@@ -282,7 +282,7 @@ class RepairLoop:
             emit(
                 self.on_event,
                 RepairEvent(
-                    "retry",
+                    "transient_retry",
                     attempt_number=len(ctx.attempts),
                     retry_attempt=retry_num,
                     retry_delay=delay,

@@ -15,7 +15,6 @@ import pytest
 from self_heal import RepairEvent, RepairLoop, RetryConfig
 from self_heal.retry import _is_transient, awith_retry, with_retry
 
-
 # _is_transient classification
 
 
@@ -139,11 +138,30 @@ def test_with_retry_invokes_on_retry_callback():
     with patch("self_heal.retry.time.sleep"):
         with_retry(
             fn,
-            RetryConfig(max_retries=3, base_delay=1.0, backoff_factor=2.0),
+            RetryConfig(max_retries=3, base_delay=1.0, backoff_factor=2.0, jitter=0),
             on_retry=lambda n, d, e: retry_calls.append((n, d)),
         )
 
     assert retry_calls == [(1, 1.0), (2, 2.0)]
+
+
+def test_with_retry_applies_jitter():
+    delays: list[float] = []
+
+    def fn():
+        if len(delays) < 4:
+            raise Exception("429")
+        return "ok"
+
+    with patch("self_heal.retry.time.sleep"):
+        with_retry(
+            fn,
+            RetryConfig(max_retries=5, base_delay=1.0, backoff_factor=1.0, jitter=0.25),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert all(0.75 <= d <= 1.25 for d in delays)
+    assert len(set(delays)) > 1
 
 
 def test_with_retry_caps_delay_at_max_delay():
@@ -330,7 +348,7 @@ def test_repair_loop_emits_retry_events():
     result = loop.run(broken, args=(5,), verify=lambda v: v == 10)
     assert result.succeeded
 
-    retry_events = [e for e in events if e.type == "retry"]
+    retry_events = [e for e in events if e.type == "transient_retry"]
     assert len(retry_events) == 2
     assert retry_events[0].retry_attempt == 1
     assert retry_events[1].retry_attempt == 2
@@ -407,7 +425,7 @@ def test_repair_loop_async_emits_retry_events():
     result = asyncio.run(loop.arun(broken, args=(5,), verify=lambda v: v == 10))
     assert result.succeeded
 
-    retry_events = [e for e in events if e.type == "retry"]
+    retry_events = [e for e in events if e.type == "transient_retry"]
     assert len(retry_events) == 1
     assert retry_events[0].retry_attempt == 1
 

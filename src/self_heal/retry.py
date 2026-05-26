@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -14,11 +15,14 @@ _TRANSIENT_STATUS_CODES = {"429", "502", "503", "504"}
 _TRANSIENT_CLASS_NAMES = {
     "RateLimitError",
     "APITimeoutError",
+    "APIConnectionError",
     "ServiceUnavailableError",
     "Timeout",
     "TimeoutError",
+    "TimeoutException",
     "ConnectTimeout",
     "ReadTimeout",
+    "RemoteProtocolError",
 }
 _TRANSIENT_PHRASES = ("rate limit", "too many requests", "timeout", "service unavailable")
 
@@ -32,12 +36,23 @@ class RetryConfig:
         base_delay: Initial wait in seconds before the first retry.
         max_delay: Upper cap on inter-retry delay (seconds).
         backoff_factor: Multiplier applied to the delay after each retry.
+        jitter: Fractional jitter applied to each delay (0.25 = ±25%).
+            Set to 0 to disable.
     """
 
     max_retries: int = 3
     base_delay: float = 1.0
     max_delay: float = 30.0
     backoff_factor: float = 2.0
+    jitter: float = 0.25
+
+
+def _compute_delay(config: RetryConfig, attempt: int) -> float:
+    """Exponential backoff with bounded random jitter, capped at max_delay."""
+    raw = config.base_delay * config.backoff_factor**attempt
+    if config.jitter > 0:
+        raw *= 1.0 + random.uniform(-config.jitter, config.jitter)
+    return min(max(raw, 0.0), config.max_delay)
 
 
 def _is_transient(exc: BaseException) -> bool:
@@ -72,10 +87,7 @@ def with_retry(
         except Exception as exc:
             if not _is_transient(exc) or attempt == config.max_retries:
                 raise
-            delay = min(
-                config.base_delay * config.backoff_factor**attempt,
-                config.max_delay,
-            )
+            delay = _compute_delay(config, attempt)
             if on_retry is not None:
                 on_retry(attempt + 1, delay, exc)
             time.sleep(delay)
@@ -100,10 +112,7 @@ async def awith_retry(
         except Exception as exc:
             if not _is_transient(exc) or attempt == config.max_retries:
                 raise
-            delay = min(
-                config.base_delay * config.backoff_factor**attempt,
-                config.max_delay,
-            )
+            delay = _compute_delay(config, attempt)
             if on_retry is not None:
                 on_retry(attempt + 1, delay, exc)
             await asyncio.sleep(delay)
