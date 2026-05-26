@@ -12,6 +12,7 @@ from self_heal.cache import RepairCache
 from self_heal.events import EventCallback
 from self_heal.llm import LLMProposer
 from self_heal.loop import RepairLoop
+from self_heal.retry import RetryConfig
 from self_heal.safety import SafetyConfig, SafetyLevel
 from self_heal.verify import Test, Verifier
 
@@ -31,6 +32,7 @@ def repair(
     cache_path: str | Path | None = None,
     safety: SafetyConfig | SafetyLevel | None = None,
     on_event: EventCallback | None = None,
+    retry_config: RetryConfig | None = None,
 ) -> Callable[[F], F]:
     """Wrap a function in an LLM-backed repair loop.
 
@@ -82,6 +84,7 @@ def repair(
             cache=resolved_cache,
             safety=resolved_safety,
             on_event=on_event,
+            retry_config=retry_config,
         )
 
         is_async = inspect.iscoroutinefunction(func)
