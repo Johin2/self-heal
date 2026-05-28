@@ -74,6 +74,36 @@ def test_cache_miss_for_different_failure(tmp_path):
     cache.close()
 
 
+def test_cache_success_not_overwritten_by_later_failure(tmp_path):
+    # A previously cached successful repair must survive a later failed
+    # attempt for the same (source, failure) key. Regression test for #46.
+    cache = RepairCache(tmp_path / "cache.db")
+    fail = Failure(kind="exception", error_type="ValueError", message="boom")
+    src = "def f(): pass"
+
+    cache.record(src, fail, "def f(): return 1", succeeded=True)
+    cache.record(src, fail, "def f(): return bad", succeeded=False)
+
+    assert cache.lookup(src, fail) == "def f(): return 1"
+
+    cache.close()
+
+
+def test_cache_failure_upgraded_by_later_success(tmp_path):
+    # A failed entry should still be replaced when a success arrives.
+    cache = RepairCache(tmp_path / "cache.db")
+    fail = Failure(kind="exception", error_type="ValueError", message="boom")
+    src = "def f(): pass"
+
+    cache.record(src, fail, "def f(): return bad", succeeded=False)
+    assert cache.lookup(src, fail) is None
+
+    cache.record(src, fail, "def f(): return 1", succeeded=True)
+    assert cache.lookup(src, fail) == "def f(): return 1"
+
+    cache.close()
+
+
 # ---------------------------------------------------------------------------
 # Safety rails
 # ---------------------------------------------------------------------------
