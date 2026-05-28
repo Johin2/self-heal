@@ -24,6 +24,7 @@ EventType = Literal[
     "propose_start",
     "propose_chunk",
     "propose_complete",
+    "stream_error",
     "install_success",
     "install_failed",
     "cache_hit",
@@ -32,6 +33,7 @@ EventType = Literal[
     "verify_success",
     "repair_succeeded",
     "repair_exhausted",
+    "transient_retry",
 ]
 
 
@@ -45,6 +47,8 @@ class RepairEvent:
     proposed_source: str | None = None
     error: str | None = None
     delta: str | None = None
+    retry_attempt: int | None = None
+    retry_delay: float | None = None
     extra: dict[str, Any] | None = None
 
 

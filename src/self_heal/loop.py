@@ -13,6 +13,7 @@ from self_heal.diagnose import classify
 from self_heal.events import EventCallback, RepairEvent, emit
 from self_heal.llm import LLMProposer
 from self_heal.propose import build_messages, extract_code
+from self_heal.retry import RetryConfig, awith_retry, with_retry
 from self_heal.safety import SafetyConfig, UnsafeProposalError, validate
 from self_heal.types import RepairAttempt, RepairResult
 from self_heal.verify import Test, Verifier, check_tests, check_verifier
@@ -69,6 +70,7 @@ class RepairLoop:
         cache: RepairCache | None = None,
         safety: SafetyConfig | None = None,
         on_event: EventCallback | None = None,
+        retry_config: RetryConfig | None = None,
     ):
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
@@ -79,6 +81,7 @@ class RepairLoop:
         self.cache = cache
         self.safety = safety
         self.on_event = on_event
+        self._retry_config = retry_config
 
     @property
     def proposer(self) -> LLMProposer:
@@ -207,9 +210,9 @@ class RepairLoop:
                 raw = "".join(chunks)
             except Exception as stream_exc:
                 emit(self.on_event, RepairEvent("stream_error", error=str(stream_exc)))
-                raw = proposer.propose(system, user)
+                raw = self._run_propose(proposer, system, user, ctx)
         else:
-            raw = proposer.propose(system, user)
+            raw = self._run_propose(proposer, system, user, ctx)
 
         emit(
             self.on_event,
@@ -254,9 +257,9 @@ class RepairLoop:
                 raw = "".join(chunks)
             except Exception as stream_exc:
                 emit(self.on_event, RepairEvent("stream_error", error=str(stream_exc)))
-                raw = await self._acall_propose(proposer, system, user)
+                raw = await self._run_apropose(proposer, system, user, ctx)
         else:
-            raw = await self._acall_propose(proposer, system, user)
+            raw = await self._run_apropose(proposer, system, user, ctx)
 
         emit(
             self.on_event,
@@ -269,6 +272,49 @@ class RepairLoop:
         if hasattr(proposer, "apropose"):
             return await proposer.apropose(system, user)
         return await asyncio.to_thread(proposer.propose, system, user)
+
+    def _make_retry_callback(
+        self, ctx: _RunContext
+    ) -> Callable[[int, float, BaseException], None]:
+        """Return an on_retry callback that emits a retry RepairEvent."""
+
+        def _cb(retry_num: int, delay: float, exc: BaseException) -> None:
+            emit(
+                self.on_event,
+                RepairEvent(
+                    "transient_retry",
+                    attempt_number=len(ctx.attempts),
+                    retry_attempt=retry_num,
+                    retry_delay=delay,
+                    error=str(exc),
+                ),
+            )
+
+        return _cb
+
+    def _run_propose(
+        self, proposer: LLMProposer, system: str, user: str, ctx: _RunContext
+    ) -> str:
+        """Invoke proposer.propose(), retrying on transient errors if configured."""
+        if self._retry_config is None:
+            return proposer.propose(system, user)
+        return with_retry(
+            lambda: proposer.propose(system, user),
+            self._retry_config,
+            self._make_retry_callback(ctx),
+        )
+
+    async def _run_apropose(
+        self, proposer: LLMProposer, system: str, user: str, ctx: _RunContext
+    ) -> str:
+        """Async proposer call with optional retry on transient errors."""
+        if self._retry_config is None:
+            return await self._acall_propose(proposer, system, user)
+        return await awith_retry(
+            lambda: self._acall_propose(proposer, system, user),
+            self._retry_config,
+            self._make_retry_callback(ctx),
+        )
 
     def _log(self, message: str) -> None:
         if self.verbose:

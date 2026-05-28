@@ -9,6 +9,7 @@ from self_heal.core import repair
 from self_heal.events import EventCallback, RepairEvent
 from self_heal.llm import LLMProposer
 from self_heal.loop import RepairLoop
+from self_heal.retry import RetryConfig
 from self_heal.safety import SafetyConfig, UnsafeProposalError
 from self_heal.types import Failure, RepairAttempt, RepairResult
 from self_heal.verify import Test, Verifier, check_tests, check_verifier
@@ -64,6 +65,7 @@ __all__ = [
     "RepairEvent",
     "RepairLoop",
     "RepairResult",
+    "RetryConfig",
     "SafetyConfig",
     "Test",
     "TogetherProposer",
