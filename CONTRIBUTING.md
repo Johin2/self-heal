@@ -15,6 +15,17 @@ This file is long on purpose. It tells you exactly what to set up, where the sea
 
 If you're not sure where to start, open a discussion in an issue before writing code. Beats writing a PR that has to be re-scoped.
 
+## Claiming an issue
+
+To avoid two people (including the maintainer) building the same thing in parallel:
+
+- **Comment on the issue to claim it** before you start coding. A quick "I'd like to take this" is enough, and you'll be assigned.
+- **Check the assignee and recent comments first.** If someone is already assigned or has an open PR, pick a different issue or offer to collaborate on theirs.
+- **The maintainer will not parallel-build a claimed issue.** Once you're assigned, the issue is yours; expect a review on your PR rather than a competing implementation.
+- **If you go quiet for ~2 weeks** with no PR or update, the claim may be released so others can pick it up. Just comment to re-claim if you come back.
+
+This keeps contributor effort from being wasted and is the one convention we ask everyone (maintainer included) to follow.
+
 ## Development setup
 
 ### Prerequisites
