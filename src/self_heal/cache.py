@@ -90,6 +90,7 @@ class RepairCache:
                     proposed_source = excluded.proposed_source,
                     succeeded = excluded.succeeded,
                     created_at = excluded.created_at
+                WHERE excluded.succeeded = 1 OR repairs.succeeded = 0
                 """,
                 (
                     sh,
