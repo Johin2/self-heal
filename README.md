@@ -1,13 +1,13 @@
 # self-heal
 
-[CI](https://github.com/Johin2/self-heal/actions/workflows/ci.yml)
-[PyPI](https://pypi.org/project/self-heal-llm/)
-[Python](https://pypi.org/project/self-heal-llm/)
-[License: MIT](LICENSE)
+[![CI](https://github.com/Johin2/self-heal/actions/workflows/ci.yml/badge.svg)](https://github.com/Johin2/self-heal/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/self-heal-llm.svg)](https://pypi.org/project/self-heal-llm/)
+[![Python](https://img.shields.io/pypi/pyversions/self-heal-llm.svg)](https://pypi.org/project/self-heal-llm/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > Automatic repair for failing Python code, powered by any LLM.
 
-self-heal demo
+![self-heal demo](assets/demo.gif)
 
 `self-heal` catches failures, proposes an LLM-guided fix with memory of prior attempts, verifies it, and retries. Works with Claude, OpenAI, Gemini, and 100+ other providers. Sync and async. One decorator.
 
@@ -32,23 +32,19 @@ Two suites, both run against Gemini 2.5 Flash, 3 max attempts, v0.4 harness.
 
 **Default suite** (19 hand-written bugs: price parsing, palindrome, flatten, roman numerals, camelCase-to-snake_case, Levenshtein, anagram, duration formatting, ...)
 
-
-| Strategy                            | Tasks passed | Success rate | LLM calls |
-| ----------------------------------- | ------------ | ------------ | --------- |
-| Naive single-shot repair            | 16 / 19      | 84%          | 17        |
-| **self-heal (multi-turn + memory)** | **18 / 19**  | **95%**      | 21        |
-
+| Strategy | Tasks passed | Success rate | LLM calls |
+|---|---:|---:|---:|
+| Naive single-shot repair | 16 / 19 | 84% | 17 |
+| **self-heal (multi-turn + memory)** | **18 / 19** | **95%** | 21 |
 
 **QuixBugs** (31 classic one-line bugs; 9 graph/tree programs skipped by the loader for custom-deserialization reasons)
 
+| Strategy | Tasks passed | Success rate | LLM calls |
+|---|---:|---:|---:|
+| Naive single-shot repair | 27 / 31 | 87% | 30 |
+| **self-heal (multi-turn + memory)** | **29 / 31** | **94%** | 35 |
 
-| Strategy                            | Tasks passed | Success rate | LLM calls |
-| ----------------------------------- | ------------ | ------------ | --------- |
-| Naive single-shot repair            | 27 / 31      | 87%          | 30        |
-| **self-heal (multi-turn + memory)** | **29 / 31**  | **94%**      | 35        |
-
-
-Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash` (default) or `--suite quixbugs`. Full numbers, historical rows, and how to contribute your own in `[benchmarks/RESULTS.md](benchmarks/RESULTS.md)`. Task source in `[benchmarks/tasks.py](benchmarks/tasks.py)`.
+Reproduce: `self-heal bench --proposer gemini --model gemini-2.5-flash` (default) or `--suite quixbugs`. Full numbers, historical rows, and how to contribute your own in [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md). Task source in [`benchmarks/tasks.py`](benchmarks/tasks.py).
 
 The +2 tasks on each suite share a pattern: the first proposed fix handles one edge case but misses another. Memory of the failed attempt plus test feedback lets the second proposal cover both. Roughly 20% more LLM calls for the additional wins. As frontier models keep improving the naive floor rises and this delta compresses; earlier runs against Gemini 2.5 Flash had naive at 68% instead of 84%, which is honest signal not cherry-picked.
 
@@ -72,28 +68,24 @@ pip install 'self-heal-llm[all]'       # everything
 
 ## Provider support
 
-
-| Adapter             | Covers                                                                                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ClaudeProposer`    | Anthropic Claude (native SDK)                                                                                                                                                   |
-| `CohereProposer`    | Cohere (native SDK)                                                                                                                                                             |
-| `OpenAIProposer`    | OpenAI + **any OpenAI-compatible endpoint** (OpenRouter, Together, Groq, Fireworks, Anyscale, Perplexity, xAI, DeepSeek, Azure, Ollama, LM Studio, vLLM, llama.cpp server, ...) |
-| `GroqProposer`      | Groq (OpenAI-compatible; reads `GROQ_API_KEY`, defaults to Llama 3.3 70B)                                                                                                       |
-| `FireworksProposer` | Fireworks AI (Llama, Qwen, Mixtral, DeepSeek hosted models)                                                                                                                     |
-| `TogetherProposer`  | Together AI (Llama, Qwen, DeepSeek hosted models)                                                                                                                               |
-| `GeminiProposer`    | Google Gemini (native SDK)                                                                                                                                                      |
-| `MistralProposer`   | Mistral AI (native SDK; reads `MISTRAL_API_KEY`, defaults to `mistral-large-latest`, supports sync / async / streaming)                                                         |
-| `LiteLLMProposer`   | 100+ providers via LiteLLM (Bedrock, Vertex, Cohere, Mistral, ...)                                                                                                              |
-
+| Adapter | Covers |
+|---|---|
+| `ClaudeProposer` | Anthropic Claude (native SDK) |
+| `CohereProposer` | Cohere (native SDK) |
+| `OpenAIProposer` | OpenAI + **any OpenAI-compatible endpoint** (OpenRouter, Together, Groq, Fireworks, Anyscale, Perplexity, xAI, DeepSeek, Azure, Ollama, LM Studio, vLLM, llama.cpp server, ...) |
+| `GroqProposer` | Groq (OpenAI-compatible; reads `GROQ_API_KEY`, defaults to Llama 3.3 70B) |
+| `FireworksProposer` | Fireworks AI (Llama, Qwen, Mixtral, DeepSeek hosted models) |
+| `TogetherProposer` | Together AI (Llama, Qwen, DeepSeek hosted models) |
+| `GeminiProposer` | Google Gemini (native SDK) |
+| `MistralProposer` | Mistral AI (native SDK; reads `MISTRAL_API_KEY`, defaults to `mistral-large-latest`, supports sync / async / streaming) |
+| `LiteLLMProposer` | 100+ providers via LiteLLM (Bedrock, Vertex, Cohere, Mistral, ...) |
 
 ## Features
 
 ### Multi-turn repair with memory
-
 Every proposal sees the history of *prior failed attempts* so the LLM can't repeat the same mistake. This is the single biggest quality win over naive retry.
 
 ### Verifiers: `verify=callable`
-
 Catch bad *return values*, not just exceptions:
 
 ```python
@@ -104,7 +96,6 @@ def extract_price(text): ...
 If the predicate returns `False` or raises, self-heal treats it as a failure and repairs.
 
 ### Test-driven repair: `tests=[...]`
-
 Give self-heal a test suite; it repairs until every test passes:
 
 ```python
@@ -116,7 +107,6 @@ def extract_price(text): ...
 ```
 
 ### Async-native
-
 The decorator auto-detects `async def` and awaits correctly; the LLM call runs in a thread pool so your event loop stays free.
 
 ```python
@@ -125,26 +115,21 @@ async def fetch_and_parse(url: str) -> dict: ...
 ```
 
 ### Prompt customization: `prompt_extra="..."`
-
 Append domain-specific instructions to every repair prompt. Useful for "always handle None inputs" or "use only the standard library."
 
 ### Bring your own LLM
-
 Implement the `LLMProposer` Protocol (`def propose(self, system: str, user: str) -> str`) and pass it in.
 
 ### Repair cache: skip the LLM when you've seen it before
-
 ```python
 from self_heal import repair
 
 @repair(cache_path=".self_heal_cache.db")
 def my_fn(...): ...
 ```
-
 First repair hits the LLM. Subsequent identical failures are served from SQLite (zero latency, zero cost). Keyed on source hash + failure signature with whitespace and memory-address normalization.
 
 ### Safety: AST rails + subprocess sandbox
-
 Two independent layers. Combine them freely.
 
 ```python
@@ -158,13 +143,11 @@ def my_fn(...): ...
 @repair(safety=SafetyConfig(level="moderate", sandbox="subprocess"))
 def my_fn(...): ...
 ```
-
 `moderate` rejects proposals that call `eval` / `exec` / `os.system`, import `subprocess` / `socket` / `pickle` / `ctypes`, or touch `__globals__` / `__class__` / other escape hatches. `strict` additionally forbids any non-whitelisted import. The subprocess sandbox adds a real process boundary: args and return values are pickled over stdin/stdout, and the child inherits none of the caller's globals (proposals must be self-contained). See [Safety](#safety) for the full trust model.
 
 > **Sandbox + imports.** When `sandbox="subprocess"` is active, the child runs with `python -I` in a fresh namespace. **The repaired function must import every module it uses at the top of the definition.** `import math` at the caller module scope does NOT reach the sandbox, so a proposal that references `math.sqrt` without a local `import math` raises `NameError` on the first call. `self-heal` already hints at this in the LLM prompt when sandbox is active, but if you're writing a proposer by hand the same rule applies.
 
 ### Progress callbacks
-
 ```python
 from self_heal import repair, RepairEvent
 
@@ -174,11 +157,9 @@ def watch(event: RepairEvent):
 @repair(on_event=watch)
 def my_fn(...): ...
 ```
-
 Hooks fire on attempt start, failure, propose start/complete, install, cache hit/miss, safety violation, verify, and repair completion. Perfect for agent UIs and observability pipelines.
 
 ### Token streaming
-
 When a callback is registered, self-heal streams LLM tokens through `propose_chunk` events as they arrive:
 
 ```python
@@ -191,16 +172,13 @@ def on_event(event: RepairEvent):
 @repair(on_event=on_event)
 def my_fn(...): ...
 ```
-
-All four built-in proposers stream natively via their SDKs. Custom proposers can implement `propose_stream(system, user) -> Iterator[str]` (and `apropose_stream` for async) to participate; those without streaming fall back to a single completion. See `[examples/streaming_progress.py](examples/streaming_progress.py)`.
+All four built-in proposers stream natively via their SDKs. Custom proposers can implement `propose_stream(system, user) -> Iterator[str]` (and `apropose_stream` for async) to participate; those without streaming fall back to a single completion. See [`examples/streaming_progress.py`](examples/streaming_progress.py).
 
 ### Native async proposers
-
 `arun` prefers each SDK's native async client when the proposer provides `apropose`, falling back to `asyncio.to_thread(propose)` otherwise. All four built-in adapters ship with native async; custom proposers work either way.
 
 ### Resilience: retry on transient provider errors
-
-Rate limits (429), service blips (502/503/504), and timeouts are common with LLM APIs. Pass a `RetryConfig` and self-heal will retry the proposer call with exponential backoff + jitter before giving up. Auth and validation errors are not retried.
+Rate limits (429), service blips (502/503/504), and timeouts are common with LLM APIs. Pass a `RetryConfig` and self-heal retries the proposer call with exponential backoff + jitter before giving up. Auth and validation errors are not retried.
 
 ```python
 from self_heal import repair, RetryConfig
@@ -209,10 +187,9 @@ from self_heal import repair, RetryConfig
 def my_fn(...): ...
 ```
 
-Defaults: 3 retries, 1s base delay, 2x backoff, ±25% jitter, capped at 30s. Retries do not count against `max_attempts` and each one fires a `transient_retry` event with `retry_attempt` and `retry_delay`. Set `retry_config=None` (the default) to disable retries.
+Defaults: 3 retries, 1s base delay, 2x backoff, ±25% jitter, capped at 30s. A `Retry-After` header on the exception (when present) takes precedence over the computed backoff. Retries do not count against `max_attempts` and each one fires a `transient_retry` event with `retry_attempt` and `retry_delay`. Pass `retry_config=None` (the default) to disable retries.
 
 ### pytest plugin: `pytest --heal`
-
 Mark any test with `@pytest.mark.heal(target="mymod.my_fn")`. When it fails with `--heal`, self-heal loads the target, repairs it using the test as verification, and prints the proposed diff at the end of the session.
 
 ```python
@@ -223,23 +200,19 @@ from mymod import extract_price
 def test_rupees():
     assert extract_price("₹1,299") == 1299.0
 ```
-
 ```bash
 pytest --heal              # print proposed fix, leave files untouched
 pytest --heal-apply        # write the fix back to disk (creates a .py.heal-backup)
 pytest --heal-apply-force  # also allow modification of git-dirty files
 ```
-
 `--heal-apply` uses libcst for AST-faithful replacement when installed, falling back to textual replacement. It refuses to modify files with uncommitted git changes unless `--heal-apply-force` is given.
 
 ### CLI: heal a function from the command line
-
 ```bash
 self-heal heal mymod.py::extract_price \
     --test tests/test_mymod.py::test_rupees \
     --apply
 ```
-
 Loads the function, runs self-heal with your pytest-style test as verification, prints a unified diff, and (with `--apply`) writes the fix back to the file.
 
 ## Why this exists
@@ -293,14 +266,12 @@ result = await loop.arun(my_async_fn, args=(...))
 ## Using different providers
 
 **Claude (default):**
-
 ```python
 @repair()
 def my_fn(...): ...
 ```
 
 **OpenAI:**
-
 ```python
 from self_heal.llm import OpenAIProposer
 
@@ -309,7 +280,6 @@ def my_fn(...): ...
 ```
 
 **Gemini:**
-
 ```python
 from self_heal.llm import GeminiProposer
 
@@ -318,7 +288,6 @@ def my_fn(...): ...
 ```
 
 **Mistral:**
-
 ```python
 from self_heal.llm import MistralProposer
 
@@ -327,7 +296,6 @@ def my_fn(...): ...
 ```
 
 **Any OpenAI-compatible endpoint (OpenRouter, Groq, Ollama, ...):**
-
 ```python
 from self_heal.llm import OpenAIProposer
 
@@ -346,7 +314,6 @@ OpenAIProposer(
 ```
 
 **LiteLLM catch-all (100+ providers):**
-
 ```python
 from self_heal.llm import LiteLLMProposer
 
@@ -395,14 +362,14 @@ def price_from_text(text: str) -> float:
 
 ### Other frameworks (decorator stacking)
 
-Examples in `[examples/`
+Examples in [`examples/`](examples):
 
-- `[with_claude_agent_sdk.py](examples/with_claude_agent_sdk.py)`
-- `[with_openai_agents.py](examples/with_openai_agents.py)`
-- `[with_langchain.py](examples/with_langchain.py)`
-- `[with_crewai.py](examples/with_crewai.py)`
+- [`with_claude_agent_sdk.py`](examples/with_claude_agent_sdk.py)
+- [`with_openai_agents.py`](examples/with_openai_agents.py)
+- [`with_langchain.py`](examples/with_langchain.py)
+- [`with_crewai.py`](examples/with_crewai.py)
 
-All examples are smoke-tested on every CI run via `[tests/test_examples_import.py](tests/test_examples_import.py)`.
+All examples are smoke-tested on every CI run via [`tests/test_examples_import.py`](tests/test_examples_import.py).
 
 ## Safety
 
@@ -422,25 +389,25 @@ def parse_price(text: str) -> float:
 
 ## Roadmap
 
-- v0.0.1: core repair loop + decorator + Claude backend
-- v0.0.2: OpenAI, Gemini, LiteLLM adapters; works with any LLM
-- v0.1.0: multi-turn memory, verifiers, test-driven repair, async, benchmark harness
-- v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks
-- v0.3.0: subprocess sandbox, `pytest --heal-apply`, QuixBugs benchmark, local-model sweep tooling
-- v0.4.0: streaming token events (`propose_chunk`), native async proposers (`apropose`) for all four adapters
-- **v0.4.1: sandbox preserves custom exceptions from proposals; `is_git_dirty` fails closed on timeout; Claude Agent SDK and LangChain/LangGraph first-class integrations**
-- v0.5: wasm sandbox, warm subprocess worker pool, first-class CrewAI / OpenAI Agents SDK integrations
-- v1.0: stable API + extended benchmark suite (HumanEval-Fix, Refactory)
+- [x] v0.0.1: core repair loop + decorator + Claude backend
+- [x] v0.0.2: OpenAI, Gemini, LiteLLM adapters; works with any LLM
+- [x] v0.1.0: multi-turn memory, verifiers, test-driven repair, async, benchmark harness
+- [x] v0.2.0: repair cache, AST safety rails, event callbacks, pytest plugin, CLI, extended benchmarks
+- [x] v0.3.0: subprocess sandbox, `pytest --heal-apply`, QuixBugs benchmark, local-model sweep tooling
+- [x] v0.4.0: streaming token events (`propose_chunk`), native async proposers (`apropose`) for all four adapters
+- [x] **v0.4.1: sandbox preserves custom exceptions from proposals; `is_git_dirty` fails closed on timeout; Claude Agent SDK and LangChain/LangGraph first-class integrations**
+- [ ] v0.5: wasm sandbox, warm subprocess worker pool, first-class CrewAI / OpenAI Agents SDK integrations
+- [ ] v1.0: stable API + extended benchmark suite (HumanEval-Fix, Refactory)
 
 ## Deeper docs
 
-- `[docs/sandbox-threat-model.md](docs/sandbox-threat-model.md)`: what the subprocess sandbox protects against and what it does not. Read before running against untrusted inputs.
-- `[docs/custom-proposer.md](docs/custom-proposer.md)`: implementing the `LLMProposer` Protocol for an unsupported provider.
-- `[docs/faq.md](docs/faq.md)`: positioning, cost, safety, integrations, contribution.
+- [`docs/sandbox-threat-model.md`](docs/sandbox-threat-model.md): what the subprocess sandbox protects against and what it does not. Read before running against untrusted inputs.
+- [`docs/custom-proposer.md`](docs/custom-proposer.md): implementing the `LLMProposer` Protocol for an unsupported provider.
+- [`docs/faq.md`](docs/faq.md): positioning, cost, safety, integrations, contribution.
 
 ## Contributing
 
-See `[CONTRIBUTING.md](CONTRIBUTING.md)` for the full guide: dev setup, everyday commands, how to add a new LLM proposer or benchmark task, and the PR checklist. Good first issues are tagged [here](https://github.com/Johin2/self-heal/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide: dev setup, everyday commands, how to add a new LLM proposer or benchmark task, and the PR checklist. Good first issues are tagged [here](https://github.com/Johin2/self-heal/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
 
 ## Development (quick start)
 
@@ -455,7 +422,6 @@ ruff check .
 ```
 
 Run the benchmark locally:
-
 ```bash
 python benchmarks/run.py --proposer claude                       # uses ANTHROPIC_API_KEY
 python benchmarks/run.py --proposer openai                       # uses OPENAI_API_KEY

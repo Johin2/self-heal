@@ -173,12 +173,42 @@ def test_with_retry_caps_delay_at_max_delay():
     with patch("self_heal.retry.time.sleep"), pytest.raises(Exception, match="429"):
         with_retry(
             fn,
-            RetryConfig(max_retries=5, base_delay=10.0, backoff_factor=10.0, max_delay=30.0),
+            RetryConfig(
+                max_retries=5,
+                base_delay=10.0,
+                backoff_factor=10.0,
+                max_delay=30.0,
+                jitter=0,
+            ),
             on_retry=lambda n, d, e: delays.append(d),
         )
 
     assert len(delays) == 5
     assert all(d <= 30.0 for d in delays)
+
+
+def test_jitter_applied_after_cap_spreads_saturated_backoff():
+    """When backoff saturates at max_delay, jitter still spreads delays."""
+    delays: list[float] = []
+
+    def fn():
+        raise Exception("429")
+
+    with patch("self_heal.retry.time.sleep"), pytest.raises(Exception, match="429"):
+        with_retry(
+            fn,
+            RetryConfig(
+                max_retries=10,
+                base_delay=1000.0,  # saturates immediately
+                backoff_factor=2.0,
+                max_delay=30.0,
+                jitter=0.25,
+            ),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert all(22.5 <= d <= 37.5 for d in delays)
+    assert len(set(delays)) > 1  # jitter actually varies them
 
 
 # awith_retry unit tests
@@ -447,3 +477,214 @@ def test_retry_config_in_all():
     import self_heal
 
     assert "RetryConfig" in self_heal.__all__
+
+
+# False-positive guards (issue: bare substring match would over-trigger)
+
+
+def test_not_transient_status_code_substring_in_value():
+    """ValueError("field value 5031 out of range") must NOT be transient."""
+    assert not _is_transient(ValueError("field value 5031 out of range"))
+
+
+def test_not_transient_status_code_inside_larger_number():
+    assert not _is_transient(Exception("expected 4290 items, got 1"))
+
+
+def test_not_transient_timeout_must_be_positive_message():
+    """RuntimeError mentioning timeout config — not the network condition."""
+    assert not _is_transient(RuntimeError("timeout must be > 0"))
+
+
+# MRO walk: subclasses of known SDK errors
+
+
+def test_is_transient_subclass_of_rate_limit_error():
+    class RateLimitError(Exception):
+        pass
+
+    class BillingRateLimitError(RateLimitError):
+        pass
+
+    assert _is_transient(BillingRateLimitError("billing"))
+
+
+# status_code attribute
+
+
+def test_is_transient_via_status_code_attribute():
+    class APIError(Exception):
+        def __init__(self, msg, status_code):
+            super().__init__(msg)
+            self.status_code = status_code
+
+    assert _is_transient(APIError("server is having a moment", status_code=503))
+    assert _is_transient(APIError("slow down", status_code=429))
+    assert not _is_transient(APIError("bad key", status_code=401))
+
+
+def test_is_transient_via_response_status_code():
+    class _Resp:
+        def __init__(self, code):
+            self.status_code = code
+
+    class HTTPError(Exception):
+        def __init__(self, msg, response):
+            super().__init__(msg)
+            self.response = response
+
+    assert _is_transient(HTTPError("err", _Resp(503)))
+    assert not _is_transient(HTTPError("err", _Resp(400)))
+
+
+# New phrases
+
+
+def test_is_transient_timed_out_phrase():
+    assert _is_transient(Exception("Read timed out."))
+
+
+def test_is_transient_connection_reset_phrase():
+    assert _is_transient(OSError("connection reset by peer"))
+
+
+def test_is_transient_connection_refused_phrase():
+    assert _is_transient(OSError("connection refused"))
+
+
+# Retry-After honoring
+
+
+def test_retry_after_attribute_overrides_computed_backoff():
+    class RateLimitError(Exception):
+        def __init__(self, msg, retry_after):
+            super().__init__(msg)
+            self.retry_after = retry_after
+
+    delays: list[float] = []
+    calls: list[int] = []
+
+    def fn():
+        calls.append(1)
+        if len(calls) < 2:
+            raise RateLimitError("slow down", retry_after=7.5)
+        return "ok"
+
+    with patch("self_heal.retry.time.sleep"):
+        with_retry(
+            fn,
+            RetryConfig(max_retries=3, base_delay=1.0, jitter=0),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert delays == [7.5]
+
+
+def test_retry_after_response_header_overrides_backoff():
+    class _Headers(dict):
+        pass
+
+    class _Resp:
+        def __init__(self, headers):
+            self.headers = headers
+            self.status_code = 429
+
+    class HTTPError(Exception):
+        def __init__(self, msg, response):
+            super().__init__(msg)
+            self.response = response
+
+    delays: list[float] = []
+    calls: list[int] = []
+
+    def fn():
+        calls.append(1)
+        if len(calls) < 2:
+            raise HTTPError("429", _Resp(_Headers({"retry-after": "12"})))
+        return "ok"
+
+    with patch("self_heal.retry.time.sleep"):
+        with_retry(
+            fn,
+            RetryConfig(max_retries=3, base_delay=1.0, jitter=0),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert delays == [12.0]
+
+
+def test_retry_after_capped_at_max_delay():
+    class RateLimitError(Exception):
+        def __init__(self, msg, retry_after):
+            super().__init__(msg)
+            self.retry_after = retry_after
+
+    delays: list[float] = []
+    calls: list[int] = []
+
+    def fn():
+        calls.append(1)
+        if len(calls) < 2:
+            raise RateLimitError("slow down", retry_after=600)
+        return "ok"
+
+    with patch("self_heal.retry.time.sleep"):
+        with_retry(
+            fn,
+            RetryConfig(max_retries=3, base_delay=1.0, max_delay=30.0, jitter=0),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert delays == [30.0]
+
+
+def test_retry_after_can_be_disabled():
+    class RateLimitError(Exception):
+        def __init__(self, msg, retry_after):
+            super().__init__(msg)
+            self.retry_after = retry_after
+
+    delays: list[float] = []
+    calls: list[int] = []
+
+    def fn():
+        calls.append(1)
+        if len(calls) < 2:
+            raise RateLimitError("slow down", retry_after=99)
+        return "ok"
+
+    with patch("self_heal.retry.time.sleep"):
+        with_retry(
+            fn,
+            RetryConfig(
+                max_retries=3, base_delay=1.0, jitter=0, respect_retry_after=False
+            ),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert delays == [1.0]  # computed backoff, not the 99s hint
+
+
+def test_malformed_retry_after_falls_back_to_backoff():
+    class RateLimitError(Exception):
+        def __init__(self, msg, retry_after):
+            super().__init__(msg)
+            self.retry_after = retry_after
+
+    delays: list[float] = []
+    calls: list[int] = []
+
+    def fn():
+        calls.append(1)
+        if len(calls) < 2:
+            raise RateLimitError("slow down", retry_after="not-a-number")
+        return "ok"
+
+    with patch("self_heal.retry.time.sleep"):
+        with_retry(
+            fn,
+            RetryConfig(max_retries=3, base_delay=2.0, jitter=0),
+            on_retry=lambda n, d, e: delays.append(d),
+        )
+
+    assert delays == [2.0]

@@ -276,7 +276,13 @@ class RepairLoop:
     def _make_retry_callback(
         self, ctx: _RunContext
     ) -> Callable[[int, float, BaseException], None]:
-        """Return an on_retry callback that emits a retry RepairEvent."""
+        """Return an on_retry callback that emits a transient_retry RepairEvent.
+
+        ``attempt_number`` on the emitted event is the *repair* attempt
+        whose proposer call is being retried (i.e. the count of failures
+        recorded so far). It is not the retry counter — that is on
+        ``retry_attempt``.
+        """
 
         def _cb(retry_num: int, delay: float, exc: BaseException) -> None:
             emit(
