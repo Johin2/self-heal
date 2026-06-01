@@ -6,13 +6,13 @@ import asyncio
 import random
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 T = TypeVar("T")
 
-_TRANSIENT_STATUS_CODES = {"429", "502", "503", "504"}
-_TRANSIENT_CLASS_NAMES = {
+_TRANSIENT_STATUS_CODES = frozenset({"429", "502", "503", "504"})
+_TRANSIENT_CLASS_NAMES = frozenset({
     "RateLimitError",
     "APITimeoutError",
     "APIConnectionError",
@@ -23,7 +23,7 @@ _TRANSIENT_CLASS_NAMES = {
     "ConnectTimeout",
     "ReadTimeout",
     "RemoteProtocolError",
-}
+})
 _TRANSIENT_PHRASES = ("rate limit", "too many requests", "timeout", "service unavailable")
 
 
@@ -38,6 +38,15 @@ class RetryConfig:
         backoff_factor: Multiplier applied to the delay after each retry.
         jitter: Fractional jitter applied to each delay (0.25 = ±25%).
             Set to 0 to disable.
+        transient_status_codes: Optional custom set of HTTP status codes
+            (as strings) that should be treated as transient.  When
+            ``None`` (the default) the built-in set is used.
+        transient_class_names: Optional custom set of exception class names
+            that should be treated as transient.  When ``None`` the
+            built-in set is used.
+        transient_phrases: Optional custom tuple of substrings matched
+            (case-insensitive) against the exception message.  When
+            ``None`` the built-in phrases are used.
     """
 
     max_retries: int = 3
@@ -45,6 +54,9 @@ class RetryConfig:
     max_delay: float = 30.0
     backoff_factor: float = 2.0
     jitter: float = 0.25
+    transient_status_codes: frozenset[str] | None = None
+    transient_class_names: frozenset[str] | None = None
+    transient_phrases: tuple[str, ...] | None = None
 
 
 def _compute_delay(config: RetryConfig, attempt: int) -> float:
@@ -55,14 +67,38 @@ def _compute_delay(config: RetryConfig, attempt: int) -> float:
     return min(max(raw, 0.0), config.max_delay)
 
 
-def _is_transient(exc: BaseException) -> bool:
-    """Return True if *exc* looks like a transient provider error worth retrying."""
-    if type(exc).__name__ in _TRANSIENT_CLASS_NAMES:
+def _is_transient(exc: BaseException, config: RetryConfig | None = None) -> bool:
+    """Return True if *exc* looks like a transient provider error worth retrying.
+
+    When *config* is None, the built-in default matcher sets are used.
+    """
+    if config is None:
+        config = RetryConfig()
+
+    class_names = (
+        config.transient_class_names
+        if config.transient_class_names is not None
+        else _TRANSIENT_CLASS_NAMES
+    )
+    if type(exc).__name__ in class_names:
         return True
+
     msg = str(exc).lower()
-    if any(code in msg for code in _TRANSIENT_STATUS_CODES):
+
+    status_codes = (
+        config.transient_status_codes
+        if config.transient_status_codes is not None
+        else _TRANSIENT_STATUS_CODES
+    )
+    if any(code in msg for code in status_codes):
         return True
-    return any(phrase in msg for phrase in _TRANSIENT_PHRASES)
+
+    phrases = (
+        config.transient_phrases
+        if config.transient_phrases is not None
+        else _TRANSIENT_PHRASES
+    )
+    return any(phrase in msg for phrase in phrases)
 
 
 def with_retry(
@@ -85,7 +121,7 @@ def with_retry(
         try:
             return fn()
         except Exception as exc:
-            if not _is_transient(exc) or attempt == config.max_retries:
+            if not _is_transient(exc, config) or attempt == config.max_retries:
                 raise
             delay = _compute_delay(config, attempt)
             if on_retry is not None:
@@ -110,7 +146,7 @@ async def awith_retry(
         try:
             return await afn()
         except Exception as exc:
-            if not _is_transient(exc) or attempt == config.max_retries:
+            if not _is_transient(exc, config) or attempt == config.max_retries:
                 raise
             delay = _compute_delay(config, attempt)
             if on_retry is not None:
