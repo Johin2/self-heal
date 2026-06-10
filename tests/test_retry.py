@@ -75,6 +75,26 @@ def test_not_transient_generic_runtime_error():
     assert not _is_transient(RuntimeError("something unexpected happened"))
 
 
+def test_not_transient_status_code_inside_larger_number():
+    assert not _is_transient(Exception("reduced context to 5040 tokens"))
+    assert not _is_transient(Exception("total size is 4294967296 bytes"))
+    assert not _is_transient(ValueError("must be < 1502 bytes"))
+
+
+def test_is_transient_by_subclass_of_connection_error():
+    class CustomConnectionError(ConnectionError):
+        pass
+
+    assert _is_transient(CustomConnectionError("connection reset"))
+
+
+def test_is_transient_by_subclass_of_timeout_error():
+    class CustomTimeoutError(TimeoutError):
+        pass
+
+    assert _is_transient(CustomTimeoutError("operation timed out"))
+
+
 # with_retry unit tests
 
 

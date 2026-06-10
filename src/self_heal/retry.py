@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -59,8 +60,10 @@ def _is_transient(exc: BaseException) -> bool:
     """Return True if *exc* looks like a transient provider error worth retrying."""
     if type(exc).__name__ in _TRANSIENT_CLASS_NAMES:
         return True
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
     msg = str(exc).lower()
-    if any(code in msg for code in _TRANSIENT_STATUS_CODES):
+    if re.search(r"\b(429|502|503|504)\b", msg):
         return True
     return any(phrase in msg for phrase in _TRANSIENT_PHRASES)
 
