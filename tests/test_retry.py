@@ -38,6 +38,15 @@ def test_is_transient_rate_limit_phrase():
     assert _is_transient(Exception("rate limit exceeded, retry after 60s"))
 
 
+def test_not_transient_timeout_validation_message():
+    assert not _is_transient(ValueError("invalid timeout value: must be positive"))
+    assert not _is_transient(Exception("the 'timeout' parameter is required"))
+
+
+def test_not_transient_rate_limit_policy_message():
+    assert not _is_transient(ValueError("rate limit policy not found"))
+
+
 def test_is_transient_by_exception_class_name_rate_limit():
     class RateLimitError(Exception):
         pass

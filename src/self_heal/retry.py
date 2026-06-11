@@ -25,7 +25,15 @@ _TRANSIENT_CLASS_NAMES = {
     "ReadTimeout",
     "RemoteProtocolError",
 }
-_TRANSIENT_PHRASES = ("rate limit", "too many requests", "timeout", "service unavailable")
+_TRANSIENT_MESSAGE_PATTERNS = (
+    re.compile(r"\brate limit (?:exceeded|reached)\b"),
+    re.compile(r"\brate limited\b"),
+    re.compile(r"\btoo many requests\b"),
+    re.compile(r"\bservice unavailable\b"),
+    re.compile(r"\b(?:connection|request|read|connect|network|operation)\s+timeout\b"),
+    re.compile(r"\btimeout after\b"),
+    re.compile(r"\btimed out\b"),
+)
 
 
 @dataclass
@@ -65,7 +73,7 @@ def _is_transient(exc: BaseException) -> bool:
     msg = str(exc).lower()
     if re.search(r"\b(429|502|503|504)\b", msg):
         return True
-    return any(phrase in msg for phrase in _TRANSIENT_PHRASES)
+    return any(pattern.search(msg) for pattern in _TRANSIENT_MESSAGE_PATTERNS)
 
 
 def with_retry(
