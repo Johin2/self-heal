@@ -201,6 +201,8 @@ class RepairLoop:
         )
 
         proposer = self.proposer
+        # The stream call is not retry-wrapped; a failed stream emits
+        # stream_error and falls back to the retry-wrapped _run_propose below.
         if hasattr(proposer, "propose_stream") and self.on_event is not None:
             chunks: list[str] = []
             try:
@@ -248,6 +250,8 @@ class RepairLoop:
         )
 
         proposer = self.proposer
+        # The stream call is not retry-wrapped; a failed stream emits
+        # stream_error and falls back to the retry-wrapped _run_apropose below.
         if hasattr(proposer, "apropose_stream") and self.on_event is not None:
             chunks: list[str] = []
             try:
