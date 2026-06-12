@@ -1,4 +1,4 @@
-#Retry helpers for transient LLM provider errors (429, 503, timeouts)
+# Retry helpers for transient LLM provider errors (429, 503, timeouts)
 
 from __future__ import annotations
 
@@ -12,7 +12,10 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-_TRANSIENT_STATUS_CODES = {"429", "502", "503", "504"}
+# Match status codes only as whole numbers so incidental digits in an error
+# message (IDs, timestamps, byte counts, codes like 5031) are not mistaken
+# for a transient status.
+_TRANSIENT_STATUS_RE = re.compile(r"\b(429|502|503|504)\b")
 _TRANSIENT_CLASS_NAMES = {
     "RateLimitError",
     "APITimeoutError",
@@ -55,6 +58,18 @@ class RetryConfig:
     backoff_factor: float = 2.0
     jitter: float = 0.25
 
+    def __post_init__(self) -> None:
+        if self.max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
+        if self.base_delay < 0:
+            raise ValueError("base_delay must be >= 0")
+        if self.max_delay < 0:
+            raise ValueError("max_delay must be >= 0")
+        if self.backoff_factor < 0:
+            raise ValueError("backoff_factor must be >= 0")
+        if self.jitter < 0:
+            raise ValueError("jitter must be >= 0")
+
 
 def _compute_delay(config: RetryConfig, attempt: int) -> float:
     """Exponential backoff with bounded random jitter, capped at max_delay."""
@@ -71,7 +86,7 @@ def _is_transient(exc: BaseException) -> bool:
     if isinstance(exc, (TimeoutError, ConnectionError)):
         return True
     msg = str(exc).lower()
-    if re.search(r"\b(429|502|503|504)\b", msg):
+    if _TRANSIENT_STATUS_RE.search(msg):
         return True
     return any(pattern.search(msg) for pattern in _TRANSIENT_MESSAGE_PATTERNS)
 

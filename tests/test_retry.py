@@ -90,6 +90,16 @@ def test_not_transient_status_code_inside_larger_number():
     assert not _is_transient(ValueError("must be < 1502 bytes"))
 
 
+def test_not_transient_status_code_as_substring_of_larger_number():
+    assert not _is_transient(Exception("invalid record 4290"))
+    assert not _is_transient(Exception("error code 5031 in batch"))
+
+
+def test_transient_status_code_word_boundary():
+    assert _is_transient(Exception("got 429 from upstream"))
+    assert _is_transient(Exception("(503)"))
+
+
 def test_is_transient_by_subclass_of_connection_error():
     class CustomConnectionError(ConnectionError):
         pass
@@ -476,3 +486,13 @@ def test_retry_config_in_all():
     import self_heal
 
     assert "RetryConfig" in self_heal.__all__
+
+
+def test_retry_config_rejects_negative_max_retries():
+    with pytest.raises(ValueError, match="max_retries"):
+        RetryConfig(max_retries=-1)
+
+
+def test_retry_config_rejects_negative_base_delay():
+    with pytest.raises(ValueError, match="base_delay"):
+        RetryConfig(base_delay=-1.0)
