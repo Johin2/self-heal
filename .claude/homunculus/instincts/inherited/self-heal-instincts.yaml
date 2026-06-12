@@ -1,0 +1,128 @@
+# Instincts generated from https://github.com/Johin2/self-heal
+# Generated: 2026-06-12T06:52:37.679Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: self-heal-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Johin2/self-heal
+---
+
+# Self Heal Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: docs, fix
+
+## Evidence
+
+- 3 commits analyzed
+- Detected conventional commit pattern
+- Examples: docs(contributing): add a "claim an issue" convention, fix(retry): use word-boundary regex and validate RetryConfig fields
+
+---
+id: self-heal-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Johin2/self-heal
+---
+
+# Self Heal Commit Length
+
+## Action
+
+Write moderate-length commit messages (~57 characters)
+
+## Evidence
+
+- Average commit message length: 57 chars
+- Based on 3 commits
+
+---
+id: self-heal-naming-files
+trigger: "when creating a new file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Johin2/self-heal
+---
+
+# Self Heal Naming Files
+
+## Action
+
+Use snake_case naming convention (Python standard)
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- All source files use snake_case: retry.py, loop.py, self_heal/, test_retry.py
+- Dominant pattern: snake_case
+
+---
+id: self-heal-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Johin2/self-heal
+---
+
+# Self Heal Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: from self_heal.retry import RetryConfig
+
+---
+id: self-heal-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Johin2/self-heal
+---
+
+# Self Heal Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: self-heal-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Johin2/self-heal
+---
+
+# Self Heal Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
