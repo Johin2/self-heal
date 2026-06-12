@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Copy, Trash2, Plus, Eye, EyeOff } from "lucide-react";
+import { Copy, Trash2, Plus } from "lucide-react";
 
 type ApiKey = {
   id: string;
@@ -49,7 +49,7 @@ export default function KeysPage() {
 
   const fetchKeys = useCallback(async () => {
     try {
-      const res = await fetch("/api/cp/v1/keys", { credentials: "include" });
+      const res = await fetch("/api/cp/keys", { credentials: "include" });
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
       setKeys(data.keys ?? []);
@@ -69,7 +69,7 @@ export default function KeysPage() {
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/cp/v1/keys", {
+      const res = await fetch("/api/cp/keys", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -90,7 +90,7 @@ export default function KeysPage() {
   const deleteKey = async (id: string) => {
     if (!confirm("Revoke this key? This cannot be undone.")) return;
     try {
-      const res = await fetch(`/api/cp/v1/keys/${id}`, {
+      const res = await fetch(`/api/cp/keys/${id}`, {
         method: "DELETE",
         credentials: "include",
       });
