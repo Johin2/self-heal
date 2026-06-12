@@ -106,6 +106,11 @@ class RepairLoop:
         prompt_extra: str | None = None,
     ) -> RepairResult:
         """Sync: call `func(*args, **kwargs)`, repairing until it succeeds."""
+        if inspect.iscoroutinefunction(func):
+            raise TypeError(
+                f"{func.__qualname__!r} is an async function. "
+                "Use RepairLoop.arun() instead of RepairLoop.run()."
+            )
         ctx = _RunContext(
             loop=self,
             func=func,
@@ -456,6 +461,7 @@ class _RunContext:
         )
 
     def apply_proposal(self, raw: str, attempt_num: int) -> None:
+        proposed: str | None = None
         try:
             proposed = extract_code(raw)
             # Safety check before exec.
@@ -499,7 +505,7 @@ class _RunContext:
                 self.loop.cache.record(
                     self.original_source,
                     self.last_failure,
-                    proposed if "proposed" in locals() else raw,
+                    proposed if proposed is not None else raw,
                     succeeded=False,
                 )
             return

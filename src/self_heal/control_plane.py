@@ -128,6 +128,7 @@ class ControlPlaneClient:
         self._lock = threading.Lock()
         self._wake = threading.Event()
         self._stop = threading.Event()
+        self._auth_failed = threading.Event()
 
         self._client = httpx.Client(timeout=timeout)
         self._flusher = threading.Thread(
@@ -186,6 +187,8 @@ class ControlPlaneClient:
     # -- internals -------------------------------------------------------
 
     def _enqueue(self, wire: dict[str, Any]) -> None:
+        if self._auth_failed.is_set():
+            return
         with self._lock:
             if len(self._buffer) >= self._max_buffer:
                 # drop oldest to bound memory under sustained outage
@@ -229,14 +232,23 @@ class ControlPlaneClient:
                 resp = self._client.post(self._endpoint, headers=headers, json=payload)
                 if 200 <= resp.status_code < 300:
                     return True
-                if resp.status_code in (400, 401, 403, 422):
-                    # Non-retryable client error.
+                if resp.status_code in (401, 403):
+                    _log.error(
+                        "control plane authentication failed (%s): %s — "
+                        "all further events will be dropped until the client is "
+                        "recreated with a valid API key",
+                        resp.status_code,
+                        resp.text[:200],
+                    )
+                    self._auth_failed.set()
+                    return True  # drop this batch; future enqueues are blocked
+                if resp.status_code in (400, 422):
                     _log.warning(
                         "control plane rejected batch (%s): %s",
                         resp.status_code,
                         resp.text[:200],
                     )
-                    return True  # drop and move on
+                    return True  # drop malformed batch, move on
                 _log.warning(
                     "control plane %s on attempt %d", resp.status_code, attempt + 1
                 )

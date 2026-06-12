@@ -156,8 +156,21 @@ def _cmd_heal(args) -> int:
     print(_format_diff(original_source, winning))
 
     if args.apply:
-        _apply_patch(src_path, fn_name, original_source, winning)
-        print(f"\nApplied patch to {src_path}.")
+        from self_heal._patch import PatchError, apply_function_patch, is_git_dirty
+
+        if is_git_dirty(src_path):
+            print(
+                f"error: {src_path} has uncommitted changes. "
+                "Commit or stash your changes before using --apply.",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            backup = apply_function_patch(src_path, fn_name, original_source, winning)
+        except PatchError as exc:
+            print(f"error: patch failed: {exc}", file=sys.stderr)
+            return 1
+        print(f"\nApplied patch to {src_path} (backup: {backup.name}).")
 
     return 0
 
@@ -273,38 +286,6 @@ def _format_diff(before: str, after: str) -> str:
         )
     )
 
-
-def _apply_patch(
-    src_path: Path, fn_name: str, original_source: str, repaired_source: str
-) -> None:
-    """Replace the function definition in the file with the repaired source.
-
-    Naive text-based replacement. If the original source appears verbatim in
-    the file, we swap it for the repaired version. Otherwise we fall back to
-    appending the repaired function at the end.
-    """
-    text = src_path.read_text(encoding="utf-8")
-    if original_source in text:
-        new_text = text.replace(original_source, repaired_source, 1)
-    else:
-        # Dedent the original, try again.
-        dedented = _dedent(original_source)
-        if dedented and dedented in text:
-            new_text = text.replace(dedented, _dedent(repaired_source), 1)
-        else:
-            new_text = text.rstrip() + "\n\n\n# --- self-heal repaired ---\n" + repaired_source + "\n"
-            print(
-                f"warning: could not locate original {fn_name} in {src_path}; "
-                "appended repaired version at the end.",
-                file=sys.stderr,
-            )
-    src_path.write_text(new_text, encoding="utf-8")
-
-
-def _dedent(s: str) -> str:
-    import textwrap
-
-    return textwrap.dedent(s)
 
 
 if __name__ == "__main__":
