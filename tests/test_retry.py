@@ -38,6 +38,15 @@ def test_is_transient_rate_limit_phrase():
     assert _is_transient(Exception("rate limit exceeded, retry after 60s"))
 
 
+def test_not_transient_timeout_validation_message():
+    assert not _is_transient(ValueError("invalid timeout value: must be positive"))
+    assert not _is_transient(Exception("the 'timeout' parameter is required"))
+
+
+def test_not_transient_rate_limit_policy_message():
+    assert not _is_transient(ValueError("rate limit policy not found"))
+
+
 def test_is_transient_by_exception_class_name_rate_limit():
     class RateLimitError(Exception):
         pass
@@ -73,6 +82,26 @@ def test_not_transient_generic_value_error():
 
 def test_not_transient_generic_runtime_error():
     assert not _is_transient(RuntimeError("something unexpected happened"))
+
+
+def test_not_transient_status_code_inside_larger_number():
+    assert not _is_transient(Exception("reduced context to 5040 tokens"))
+    assert not _is_transient(Exception("total size is 4294967296 bytes"))
+    assert not _is_transient(ValueError("must be < 1502 bytes"))
+
+
+def test_is_transient_by_subclass_of_connection_error():
+    class CustomConnectionError(ConnectionError):
+        pass
+
+    assert _is_transient(CustomConnectionError("connection reset"))
+
+
+def test_is_transient_by_subclass_of_timeout_error():
+    class CustomTimeoutError(TimeoutError):
+        pass
+
+    assert _is_transient(CustomTimeoutError("operation timed out"))
 
 
 # with_retry unit tests
