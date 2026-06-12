@@ -1,89 +1,72 @@
-```markdown
 # self-heal Development Patterns
 
-> Auto-generated skill from repository analysis
+> Auto-generated skill from repository analysis (manually corrected)
 
 ## Overview
-This skill teaches you the development patterns and conventions used in the `self-heal` Python repository. You'll learn how to structure files, write imports and exports, follow commit message conventions, and write tests in alignment with the project's established practices. This guide is ideal for contributors seeking to maintain consistency and code quality in the `self-heal` codebase.
+This skill teaches you the development patterns and conventions used in the `self-heal` Python repository. You'll learn how to structure files, write imports and exports, follow commit message conventions, and write tests in alignment with the project's established practices.
 
 ## Coding Conventions
 
 ### File Naming
-- Use **camelCase** for file names.
-  - **Example:** `selfHealCore.py`, `errorHandler.py`
+- Use **snake_case** for file names.
+  - **Example:** `retry.py`, `loop.py`, `self_heal_core.py`
 
 ### Import Style
-- Use **relative imports** within the package.
+- Use **absolute imports** for the public package API and **relative imports** within a sub-package where appropriate.
   - **Example:**
     ```python
-    from .utils import parseData
-    from .errorHandler import handleError
+    from self_heal.retry import RetryConfig, with_retry
+    from self_heal.events import emit, RepairEvent
     ```
 
 ### Export Style
-- Use **named exports** (explicitly listing what is exported).
+- Use `__all__` to declare the public API explicitly.
   - **Example:**
     ```python
-    __all__ = ['selfHealCore', 'handleError']
+    __all__ = ["RepairLoop", "RetryConfig", "RepairResult"]
     ```
 
 ### Commit Messages
 - Follow **conventional commit** format.
-- Use prefixes like `docs` and `fix`.
-- Keep commit messages concise (average ~57 characters).
+- Common prefixes: `feat`, `fix`, `docs`, `test`, `chore`, `refactor`.
   - **Examples:**
     ```
-    docs: update README with installation instructions
-    fix: handle edge case in selfHealCore.py
+    fix(retry): use word-boundary regex for status code detection
+    docs(contributing): add a "claim an issue" convention
     ```
-
-## Workflows
-
-### Commit Changes
-**Trigger:** When making any code or documentation changes.
-**Command:** `/commit-changes`
-
-1. Make your code or documentation updates.
-2. Stage your changes with `git add`.
-3. Write a commit message using the conventional commit format:
-   - Prefix with `docs:` for documentation changes.
-   - Prefix with `fix:` for bug fixes.
-4. Keep the commit message concise and descriptive.
-5. Commit your changes.
-
-### Add a New Module
-**Trigger:** When adding new functionality to the codebase.
-**Command:** `/add-module`
-
-1. Create a new file using camelCase naming (e.g., `newFeature.py`).
-2. Use relative imports to bring in dependencies from within the package.
-3. Explicitly list new exports in the module's `__all__` variable.
-4. Write or update tests for the new module (see Testing Patterns).
-5. Commit your changes using the conventional commit format.
-
-### Write Tests
-**Trigger:** When adding or updating code that requires testing.
-**Command:** `/write-tests`
-
-1. Create a test file matching the pattern `*.test.*` (e.g., `selfHealCore.test.py`).
-2. Write test cases for new or modified functionality.
-3. Use the project's preferred (but currently unknown) testing framework.
-4. Run tests to ensure correctness.
-5. Commit your test files.
 
 ## Testing Patterns
 
-- Test files follow the pattern `*.test.*` (e.g., `module.test.py`).
-- The specific testing framework is not detected; review existing test files for framework clues.
-- Place tests close to the code they cover or in a dedicated test directory.
-- Example test file:
-  ```python
-  # selfHealCore.test.py
-  from .selfHealCore import someFunction
+- **Framework:** pytest
+- **Test location:** `tests/` directory at the repo root
+- **File naming:** `test_<module>.py` (e.g., `test_retry.py`, `test_loop.py`)
+- **Run tests:** `pytest` or `python -m pytest`
+- **Run with coverage:** `pytest --cov=src --cov-report=term-missing`
 
-  def test_someFunction():
-      assert someFunction(2) == 4
-  ```
+Example test:
+```python
+# tests/test_retry.py
+import pytest
+from self_heal.retry import RetryConfig, with_retry
+
+def test_with_retry_returns_immediately_on_success():
+    result = with_retry(lambda: "ok", RetryConfig(max_retries=3))
+    assert result == "ok"
+```
+
+## Workflows
+
+### Add a New Module
+1. Create a new file using snake_case naming (e.g., `new_feature.py`) under `src/self_heal/`.
+2. Add the public symbols to `src/self_heal/__init__.py`'s `__all__`.
+3. Write tests in `tests/test_<module>.py`.
+4. Commit using conventional commit format.
+
+### Write Tests
+1. Create `tests/test_<module>.py`.
+2. Import from the public `self_heal` package or from `self_heal.<module>` directly.
+3. Use `pytest` fixtures and `unittest.mock.patch` for side effects.
+4. Run `pytest` to verify all tests pass.
 
 ## Commands
 | Command           | Purpose                                      |
@@ -91,4 +74,3 @@ This skill teaches you the development patterns and conventions used in the `sel
 | /commit-changes   | Guide for committing code or doc changes     |
 | /add-module       | Steps for adding a new module                |
 | /write-tests      | Instructions for writing and running tests   |
-```

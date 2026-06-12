@@ -48,7 +48,7 @@ Write moderate-length commit messages (~57 characters)
 ---
 id: self-heal-naming-files
 trigger: "when creating a new file"
-confidence: 0.8
+confidence: 0.9
 domain: code-style
 source: repo-analysis
 source_repo: https://github.com/Johin2/self-heal
@@ -58,12 +58,13 @@ source_repo: https://github.com/Johin2/self-heal
 
 ## Action
 
-Use camelCase naming convention
+Use snake_case naming convention (Python standard)
 
 ## Evidence
 
 - Analyzed file naming patterns in repository
-- Dominant pattern: camelCase
+- All source files use snake_case: retry.py, loop.py, self_heal/, test_retry.py
+- Dominant pattern: snake_case
 
 ---
 id: self-heal-import-relative
@@ -83,7 +84,7 @@ Use relative imports for project files
 ## Evidence
 
 - Import analysis shows relative import pattern
-- Example: import { x } from '../lib/x'
+- Example: from self_heal.retry import RetryConfig
 
 ---
 id: self-heal-export-style
