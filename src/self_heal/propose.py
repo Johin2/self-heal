@@ -55,6 +55,8 @@ SANDBOX_IMPORT_HINT = (
     "first sandboxed call will raise NameError."
 )
 
+_REPAIR_SYSTEM_SANDBOX = REPAIR_SYSTEM + SANDBOX_IMPORT_HINT
+
 
 def build_messages(
     source: str,
@@ -86,7 +88,7 @@ def build_messages(
         history_section=history_section,
         extra_section=extra_section,
     )
-    system = REPAIR_SYSTEM + SANDBOX_IMPORT_HINT if sandbox else REPAIR_SYSTEM
+    system = _REPAIR_SYSTEM_SANDBOX if sandbox else REPAIR_SYSTEM
     return system, user
 
 

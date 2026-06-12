@@ -4,9 +4,9 @@ Each submodule is lazy-imported so missing framework SDKs don't break
 `import self_heal`.
 
 Available integrations:
-- `self_heal.integrations.claude_agent_sdk` — healing_tool decorator
-  combining `@tool` (Claude Agent SDK) with `@repair` (self-heal).
+- `self_heal.integrations.claude_agent_sdk` — healing_tool for Claude Agent SDK
+- `self_heal.integrations.langgraph` — healing_tool for LangChain / LangGraph
+- `self_heal.integrations.openai_agents` — healing_tool for OpenAI Agents SDK
 
-More integrations (CrewAI, LangGraph) are roadmap items; see the
-`examples/` directory for the decorator-stacking pattern today.
+See `examples/` for CrewAI and other decorator-stacking patterns.
 """

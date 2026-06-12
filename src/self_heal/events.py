@@ -4,9 +4,9 @@ Pass `on_event=callable` to `RepairLoop` or `@repair`. The callable
 receives a `RepairEvent` on every significant step. Agent UIs can stream
 progress; observability backends can record metrics.
 
-Streaming (token-level) is deferred to v0.3. For now, events are
-discrete: attempt start, failure, propose start/complete, install,
-verify, success/failure.
+Token-level streaming is live: proposers that implement `propose_stream`
+or `apropose_stream` emit `propose_chunk` events for each delta. Falls
+back to discrete events if streaming is unavailable or raises.
 """
 
 from __future__ import annotations

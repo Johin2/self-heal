@@ -14,7 +14,7 @@ export default function Home() {
           <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
           <span>self-heal</span>
           <span className="ml-2 rounded-md border border-neutral-800 px-1.5 py-0.5 text-xs text-neutral-500">
-            v0.4.0
+            v0.5.0
           </span>
         </div>
         <nav className="flex items-center gap-6 text-sm text-neutral-400">

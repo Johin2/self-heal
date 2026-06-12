@@ -56,6 +56,7 @@ all = [
 ]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.6.0",
     "anthropic>=0.40.0",
     "cohere>=5.0.0",
@@ -112,4 +113,4 @@ extend-immutable-calls = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-ra -q"
+addopts = "-ra -q --cov=src/self_heal --cov-report=term-missing --cov-fail-under=80"

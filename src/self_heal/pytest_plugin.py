@@ -20,8 +20,9 @@ Usage
    target function's source, runs a repair loop using the test as
    verification, and prints the proposed fix at the end of the session.
 
-This v0.2 plugin prints suggestions. Auto-applying patches to disk is
-slated for v0.3 behind `--heal-apply`.
+The plugin prints suggested repairs and, with `--heal-apply`, writes
+them back to disk using libcst (falls back to text replacement) and
+creates a `.py.heal-backup` next to each modified file.
 """
 
 from __future__ import annotations
