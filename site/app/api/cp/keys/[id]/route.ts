@@ -3,7 +3,8 @@ import { proxy } from "@/lib/control-plane";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return proxy(request, `/v1/keys/${params.id}`);
+  const { id } = await params;
+  return proxy(request, `/v1/keys/${id}`);
 }
